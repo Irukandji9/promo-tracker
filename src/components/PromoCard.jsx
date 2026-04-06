@@ -91,7 +91,7 @@ export default function PromoCard({ promo, onEdit, onKpi, onDelete }) {
 
       {/* Analysis snippet */}
       {promo.analysis_result && (
-        <div style={{ fontSize: '0.78rem', color: 'var(--accent3)', background: 'rgba(71,212,255,0.05)', border: '1px solid rgba(71,212,255,0.12)', borderRadius: '6px', padding: '8px 10px', marginBottom: '12px', lineHeight: 1.5 }}>
+        <div style={{ fontSize: '0.78rem', color: '#0369a1', background: 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.18)', borderRadius: '6px', padding: '8px 10px', marginBottom: '12px', lineHeight: 1.5 }}>
           ⚡ {promo.analysis_result.slice(0, 180)}{promo.analysis_result.length > 180 ? '…' : ''}
         </div>
       )}

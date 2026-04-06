@@ -193,7 +193,7 @@ Be direct, data-driven and commercially focused. Use ₺ for currency. Keep it u
         height: '62px',
         position: 'sticky',
         top: 0,
-        background: 'rgba(10,10,15,0.92)',
+        background: 'rgba(245,245,247,0.92)',
         backdropFilter: 'blur(12px)',
         zIndex: 50,
       }}>
