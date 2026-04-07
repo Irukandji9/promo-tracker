@@ -4,6 +4,7 @@ import PromoForm from './components/PromoForm'
 import KpiForm from './components/KpiForm'
 import PromoCard from './components/PromoCard'
 import MonthlyReport from './components/MonthlyReport'
+import MonthlyAnalysis from './components/MonthlyAnalysis'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const currentYear = new Date().getFullYear()
@@ -22,6 +23,7 @@ export default function App() {
   const [editPromo, setEditPromo] = useState(null)
   const [kpiPromo, setKpiPromo] = useState(null)
   const [showReport, setShowReport] = useState(false)
+  const [showAnalysis, setShowAnalysis] = useState(false)
   const [toast, setToast] = useState(null)
   const [filterType, setFilterType] = useState('All')
   const [filterStatus, setFilterStatus] = useState('All')
@@ -246,6 +248,7 @@ Be direct, data-driven, commercially focused. Use ₺ for currency.`
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button className="btn-ghost" onClick={() => setShowReport(true)} disabled={promos.length === 0}>📋 Monthly Report</button>
+          <button className="btn-ghost" style={{ color: 'var(--accent)', borderColor: 'rgba(26,110,245,0.3)' }} onClick={() => setShowAnalysis(true)} disabled={promos.length === 0}>🧠 Monthly Analysis</button>
           <button className="btn-primary" onClick={() => { setEditPromo(null); setShowForm(true) }}>+ New Promo</button>
         </div>
       </header>
@@ -376,6 +379,14 @@ Be direct, data-driven, commercially focused. Use ₺ for currency.`
         />
       )}
 
+      {showAnalysis && (
+        <MonthlyAnalysis
+          promos={promos}
+          month={selectedMonth}
+          monthEvents={monthEvents}
+          onClose={() => setShowAnalysis(false)}
+        />
+      )}
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   )
