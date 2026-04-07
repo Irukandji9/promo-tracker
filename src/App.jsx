@@ -146,17 +146,14 @@ export default function App() {
   const handleAnalyse = async (promoData) => {
     const prompt = buildAnalysisPrompt(promoData)
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/analyse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }]
-        })
+        body: JSON.stringify({ prompt })
       })
       const data = await res.json()
-      const text = data.content?.map(b => b.text || '').join('') || 'Analysis unavailable.'
+      if (data.error) throw new Error(data.error)
+      const text = data.result || 'Analysis unavailable.'
       await supabase.from('promotions').update({
         analysis_result: text,
         status: 'analysed',
@@ -200,17 +197,14 @@ ${promos.map(p => `- ${p.name} | ${p.type} | Obj: ${p.campaign_objective || 'N/A
 Be direct, data-driven, commercially focused. Use ₺ for currency.`
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/narrative', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }]
-        })
+        body: JSON.stringify({ prompt })
       })
       const data = await res.json()
-      return data.content?.map(b => b.text || '').join('') || 'Summary unavailable.'
+      if (data.error) throw new Error(data.error)
+      return data.result || 'Summary unavailable.'
     } catch (e) {
       return 'Error: ' + e.message
     }
