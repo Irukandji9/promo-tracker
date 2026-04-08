@@ -43,7 +43,7 @@ function TypeTag({ type }) {
   return <span className="tag" style={{ background: c.bg, color: c.color, border: `1px solid ${c.border}` }}>{type}</span>
 }
 
-export default function App() {
+export default function App({ session }) {
   const [promos, setPromos] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedMonth, setSelectedMonth] = useState(ALL_MONTHS[new Date().getMonth()])
@@ -60,6 +60,10 @@ export default function App() {
   const [expandedRow, setExpandedRow] = useState(null)
 
   const notify = (msg, type = 'success') => setToast({ msg, type })
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+  }
 
   const fetchPromos = useCallback(async () => {
     setLoading(true)
@@ -259,6 +263,9 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
         <div style={{ display: 'flex', gap: '7px', alignItems: 'center' }}>
           <button className="btn-analysis" style={{ padding: '7px 14px', fontSize: '0.8rem' }} onClick={() => setShowAnalysis(true)} disabled={promos.length === 0}>🧠 Monthly Analysis</button>
           <button className="btn-primary" onClick={() => { setEditPromo(null); setShowForm(true) }}>+ New Promo</button>
+          <div style={{ width: '1px', height: '20px', background: 'var(--border)', margin: '0 2px' }} />
+          <span style={{ fontSize: '0.72rem', color: 'var(--text3)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session?.user?.email}</span>
+          <button className="btn-ghost" style={{ fontSize: '0.75rem', padding: '5px 10px' }} onClick={handleLogout}>Sign Out</button>
         </div>
       </header>
 
