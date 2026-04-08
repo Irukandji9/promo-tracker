@@ -1,98 +1,77 @@
 import React, { useState } from 'react'
 
-function fmt(v) {
-  if (!v) return '—'
-  return `₺${Number(v).toLocaleString('tr-TR')}`
-}
-function fmtN(v) {
-  if (!v) return '—'
-  return Number(v).toLocaleString('tr-TR')
-}
-function ratio(a, b) {
-  if (!a || !b) return null
-  return ((Number(a) / Number(b)) * 100).toFixed(1)
-}
+function fmt(v) { return v ? `₺${Number(v).toLocaleString('tr-TR')}` : '—' }
+function fmtN(v) { return v ? Number(v).toLocaleString('tr-TR') : '—' }
+function ratio(a, b) { return (a && b) ? ((Number(a) / Number(b)) * 100).toFixed(1) : null }
 function ratioColor(pct) {
-  if (pct === null) return 'var(--text2)'
+  if (!pct) return 'var(--text2)'
   return Number(pct) <= 20 ? 'var(--success)' : Number(pct) <= 28 ? 'var(--warning)' : 'var(--danger)'
 }
 
-function SectionScore({ label, score, color }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-      <span style={{ fontSize: '0.8rem', color: 'var(--text2)', minWidth: '140px' }}>{label}</span>
-      <div style={{ flex: 1, height: '6px', background: 'var(--bg3)', borderRadius: '3px', overflow: 'hidden' }}>
-        <div style={{ width: `${score}%`, height: '100%', background: color, borderRadius: '3px', transition: 'width 0.6s ease' }} />
-      </div>
-      <span style={{ fontSize: '0.78rem', fontFamily: 'var(--font-mono)', color, minWidth: '36px', textAlign: 'right' }}>{score}/100</span>
-    </div>
-  )
-}
-
 function CategoryBlock({ title, icon, promos, color }) {
-  if (!promos || promos.length === 0) return (
-    <div style={{ background: 'var(--bg3)', borderRadius: '8px', padding: '14px 16px', marginBottom: '12px', opacity: 0.5 }}>
-      <div style={{ fontSize: '0.82rem', color: 'var(--text2)' }}>{icon} {title} — No data this month</div>
-    </div>
-  )
-
   const withKpis = promos.filter(p => p.bonus_cost)
   const totals = withKpis.reduce((acc, p) => ({
     targeted: acc.targeted + (Number(p.targeted_count) || 0),
     depositors: acc.depositors + (Number(p.depositors) || 0),
+    participants: acc.participants + (Number(p.participants) || 0),
     bonus_cost: acc.bonus_cost + (Number(p.bonus_cost) || 0),
     ggr: acc.ggr + (Number(p.ggr) || 0),
     ngr: acc.ngr + (Number(p.ngr) || 0),
-    engaged: acc.engaged + (Number(p.unique_players_engaged) || 0),
-  }), { targeted: 0, depositors: 0, bonus_cost: 0, ggr: 0, ngr: 0, engaged: 0 })
+  }), { targeted: 0, depositors: 0, participants: 0, bonus_cost: 0, ggr: 0, ngr: 0 })
 
   const bGgr = ratio(totals.bonus_cost, totals.ggr)
   const conv = ratio(totals.depositors, totals.targeted)
-  const roi = totals.bonus_cost ? (((totals.ngr - totals.bonus_cost) / totals.bonus_cost) * 100).toFixed(1) : null
   const breaches = withKpis.filter(p => p.bonus_cost && p.ggr && ratio(p.bonus_cost, p.ggr) > 20)
 
+  if (!promos.length) return (
+    <div style={{ background: 'var(--bg3)', borderRadius: '8px', padding: '12px 14px', marginBottom: '10px', opacity: 0.5, fontSize: '0.82rem', color: 'var(--text2)' }}>
+      {icon} {title} — No promotions this month
+    </div>
+  )
+
   return (
-    <div style={{ background: 'var(--bg2)', border: `1px solid ${color}30`, borderLeft: `3px solid ${color}`, borderRadius: '8px', padding: '14px 16px', marginBottom: '12px' }}>
+    <div style={{ background: 'var(--bg2)', border: `1px solid var(--border)`, borderLeft: `3px solid ${color}`, borderRadius: '8px', padding: '12px 14px', marginBottom: '10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem' }}>{icon} {title}</div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <span style={{ fontSize: '0.72rem', background: 'var(--bg3)', padding: '2px 8px', borderRadius: '4px', color: 'var(--text2)' }}>{promos.length} promos</span>
-          {withKpis.length > 0 && <span style={{ fontSize: '0.72rem', background: 'var(--bg3)', padding: '2px 8px', borderRadius: '4px', color: 'var(--text2)' }}>{withKpis.length} with KPIs</span>}
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <span style={{ fontSize: '0.7rem', background: 'var(--bg3)', padding: '2px 8px', borderRadius: '4px', color: 'var(--text2)' }}>{promos.length} promos</span>
+          <span style={{ fontSize: '0.7rem', background: 'var(--bg3)', padding: '2px 8px', borderRadius: '4px', color: 'var(--text2)' }}>{withKpis.length} with KPIs</span>
         </div>
       </div>
       {withKpis.length > 0 ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '8px' }}>
-          {totals.targeted > 0 && <div style={{ background: 'var(--bg3)', borderRadius: '6px', padding: '8px 10px' }}><div style={{ fontSize: '0.62rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Targeted</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.88rem', marginTop: '2px' }}>{fmtN(totals.targeted)}</div></div>}
-          {totals.depositors > 0 && <div style={{ background: 'var(--bg3)', borderRadius: '6px', padding: '8px 10px' }}><div style={{ fontSize: '0.62rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Depositors</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.88rem', marginTop: '2px' }}>{fmtN(totals.depositors)}</div></div>}
-          {totals.engaged > 0 && <div style={{ background: 'var(--bg3)', borderRadius: '6px', padding: '8px 10px' }}><div style={{ fontSize: '0.62rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Engaged</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.88rem', marginTop: '2px' }}>{fmtN(totals.engaged)}</div></div>}
-          {conv && <div style={{ background: 'var(--bg3)', borderRadius: '6px', padding: '8px 10px' }}><div style={{ fontSize: '0.62rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Conv. Rate</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.88rem', marginTop: '2px' }}>{conv}%</div></div>}
-          <div style={{ background: 'var(--bg3)', borderRadius: '6px', padding: '8px 10px' }}><div style={{ fontSize: '0.62rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Bonus Cost</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.88rem', marginTop: '2px', color: 'var(--danger)' }}>{fmt(totals.bonus_cost)}</div></div>
-          <div style={{ background: 'var(--bg3)', borderRadius: '6px', padding: '8px 10px' }}><div style={{ fontSize: '0.62rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>NGR</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.88rem', marginTop: '2px', color: totals.ngr >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmt(totals.ngr)}</div></div>
-          {bGgr && <div style={{ background: 'var(--bg3)', borderRadius: '6px', padding: '8px 10px' }}><div style={{ fontSize: '0.62rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Bonus/GGR</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.88rem', marginTop: '2px', color: ratioColor(bGgr) }}>{bGgr}%</div></div>}
-          {roi && <div style={{ background: 'var(--bg3)', borderRadius: '6px', padding: '8px 10px' }}><div style={{ fontSize: '0.62rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>ROI</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.88rem', marginTop: '2px', color: Number(roi) >= 0 ? 'var(--success)' : 'var(--danger)' }}>{roi}%</div></div>}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '7px' }}>
+          {totals.targeted > 0 && <div style={{ background: 'var(--bg3)', borderRadius: '6px', padding: '7px 10px' }}><div style={{ fontSize: '0.62rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Targeted</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', marginTop: '2px' }}>{fmtN(totals.targeted)}</div></div>}
+          {totals.participants > 0 && <div style={{ background: 'var(--bg3)', borderRadius: '6px', padding: '7px 10px' }}><div style={{ fontSize: '0.62rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Participants</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', marginTop: '2px' }}>{fmtN(totals.participants)}</div></div>}
+          {conv && <div style={{ background: 'var(--bg3)', borderRadius: '6px', padding: '7px 10px' }}><div style={{ fontSize: '0.62rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Conv.</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', marginTop: '2px' }}>{conv}%</div></div>}
+          <div style={{ background: 'var(--bg3)', borderRadius: '6px', padding: '7px 10px' }}><div style={{ fontSize: '0.62rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Bonus Cost</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', marginTop: '2px', color: 'var(--danger)' }}>{fmt(totals.bonus_cost)}</div></div>
+          <div style={{ background: 'var(--bg3)', borderRadius: '6px', padding: '7px 10px' }}><div style={{ fontSize: '0.62rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>NGR</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', marginTop: '2px', color: totals.ngr >= 0 ? 'var(--success)' : 'var(--danger)' }}>{fmt(totals.ngr)}</div></div>
+          {bGgr && <div style={{ background: 'var(--bg3)', borderRadius: '6px', padding: '7px 10px' }}><div style={{ fontSize: '0.62rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>B/GGR</div><div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', marginTop: '2px', color: ratioColor(bGgr) }}>{bGgr}%</div></div>}
         </div>
       ) : (
-        <p style={{ fontSize: '0.8rem', color: 'var(--text3)', fontStyle: 'italic' }}>No KPI data entered yet for these promotions.</p>
+        <p style={{ fontSize: '0.8rem', color: 'var(--text3)', fontStyle: 'italic' }}>No KPI data yet.</p>
       )}
       {breaches.length > 0 && (
-        <div style={{ marginTop: '10px', fontSize: '0.76rem', color: 'var(--danger)', background: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.15)', borderRadius: '6px', padding: '7px 10px' }}>
-          🔴 {breaches.length} promo{breaches.length > 1 ? 's' : ''} over 20% threshold: {breaches.map(p => p.name).join(', ')}
+        <div style={{ marginTop: '8px', fontSize: '0.75rem', color: 'var(--danger)', background: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.15)', borderRadius: '6px', padding: '6px 10px' }}>
+          🔴 {breaches.length} promo{breaches.length > 1 ? 's' : ''} over 20%: {breaches.map(p => p.name).join(', ')}
         </div>
       )}
     </div>
   )
 }
 
-export default function MonthlyAnalysis({ promos, month, monthEvents, onClose }) {
+export default function MonthlyAnalysis({ promos, month, monthEvents, domainFilter, onClose }) {
   const [analysis, setAnalysis] = useState(null)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
 
-  const funnels = promos.filter(p => p.type === 'Promo Code')
-  const reloads = promos.filter(p => p.type === 'Reload')
-  const onsite = promos.filter(p => p.type === 'Onsite')
-  const withKpis = promos.filter(p => p.bonus_cost)
+  const filtered = domainFilter && domainFilter !== 'All' ? promos.filter(p => p.domain === domainFilter) : promos
+  const withKpis = filtered.filter(p => p.bonus_cost)
+
+  const adhoc = filtered.filter(p => p.type === 'Ad-Hoc')
+  const promoCodes = filtered.filter(p => p.type === 'Promo Code')
+  const reloads = filtered.filter(p => p.type === 'Reload')
+  const funnels = filtered.filter(p => p.type === 'Funnel')
 
   const totals = withKpis.reduce((acc, p) => ({
     targeted: acc.targeted + (Number(p.targeted_count) || 0),
@@ -105,68 +84,54 @@ export default function MonthlyAnalysis({ promos, month, monthEvents, onClose })
   const overallBGgr = ratio(totals.bonus_cost, totals.ggr)
   const overallRoi = totals.bonus_cost ? (((totals.ngr - totals.bonus_cost) / totals.bonus_cost) * 100).toFixed(1) : null
   const allBreaches = withKpis.filter(p => p.bonus_cost && p.ggr && ratio(p.bonus_cost, p.ggr) > 20)
-  const topPerformer = [...withKpis].sort((a, b) => (Number(b.ngr) || 0) - (Number(a.ngr) || 0))[0]
-  const worstPerformer = [...withKpis].sort((a, b) => (Number(a.ngr) || 0) - (Number(b.ngr) || 0))[0]
+  const top = [...withKpis].sort((a, b) => (Number(b.ngr) || 0) - (Number(a.ngr) || 0))[0]
+  const worst = [...withKpis].sort((a, b) => (Number(a.ngr) || 0) - (Number(b.ngr) || 0))[0]
 
   const buildPrompt = () => {
-    const promoDetail = (arr, label) => arr.filter(p => p.bonus_cost).map(p => {
+    const detail = (arr) => arr.filter(p => p.bonus_cost).map(p => {
       const bggr = p.bonus_cost && p.ggr ? ratio(p.bonus_cost, p.ggr) + '%' : 'N/A'
       const conv = p.depositors && p.targeted_count ? ratio(p.depositors, p.targeted_count) + '%' : 'N/A'
-      const lift = p.control_group_count && p.control_group_responders && p.depositors && p.targeted_count
-        ? (Number(ratio(p.depositors, p.targeted_count)) - Number(ratio(p.control_group_responders, p.control_group_count))).toFixed(1) + 'pp lift'
-        : null
-      return `  • ${p.name} | Obj: ${p.campaign_objective || 'N/A'} | LC: ${p.lifecycle_stage || 'N/A'} | Val: ${p.value_segment || 'N/A'} | Conv: ${conv} | Bonus: ₺${Number(p.bonus_cost || 0).toLocaleString()} | GGR: ₺${Number(p.ggr || 0).toLocaleString()} | NGR: ₺${Number(p.ngr || 0).toLocaleString()} | B/GGR: ${bggr}${lift ? ' | ' + lift : ''}${p.event_context ? ' | Event: ' + p.event_context : ''}`
-    }).join('\n') || '  No KPI data available'
+      return `  • ${p.name} | Domain: ${p.domain} | LC: ${p.lifecycle_stage || 'N/A'} | Val: ${p.value_segment || 'N/A'} | Conv: ${conv} | Bonus: ₺${Number(p.bonus_cost || 0).toLocaleString()} | GGR: ₺${Number(p.ggr || 0).toLocaleString()} | NGR: ₺${Number(p.ngr || 0).toLocaleString()} | B/GGR: ${bggr}`
+    }).join('\n') || '  No KPI data'
 
-    return `You are a senior CRM Analyst at Hepsibahis, an online sports betting and casino brand in the Turkish market. Your audience is the Head of CRM and senior leadership team.
+    return `You are a senior CRM Analyst at Hepsibahis (brands: Hepsibahis, MrOyun, UWIN), online sports betting and casino in the Turkish market.
+Monthly CRM analysis for ${month}${domainFilter && domainFilter !== 'All' ? ` — ${domainFilter} only` : ' — All domains'}.
+Critical benchmark: Bonus Cost / GGR ≤ 20%.
 
-Produce a structured monthly CRM performance analysis for ${month}. Be sharp, commercially focused, and data-driven. Use ₺ for currency. The critical benchmark is Bonus Cost / GGR ≤ 20%.
+Month context: ${monthEvents || 'None noted'}
+Threshold breaches: ${allBreaches.length > 0 ? allBreaches.map(p => `${p.name} (${ratio(p.bonus_cost, p.ggr)}%)`).join(', ') : 'None'}
 
-MONTH CONTEXT: ${monthEvents || 'No specific events noted'}
+TOTALS: ${withKpis.length}/${filtered.length} promos with KPI data
+Targeted: ${fmtN(totals.targeted)} | Depositors: ${fmtN(totals.depositors)} | Bonus Cost: ${fmt(totals.bonus_cost)} | GGR: ${fmt(totals.ggr)} | NGR: ${fmt(totals.ngr)} | B/GGR: ${overallBGgr || 'N/A'}% | ROI: ${overallRoi || 'N/A'}%
 
-OVERALL TOTALS (promotions with KPI data: ${withKpis.length}/${promos.length}):
-- Total Targeted: ${fmtN(totals.targeted)}
-- Total Depositors: ${fmtN(totals.depositors)}
-- Total Bonus Cost: ${fmt(totals.bonus_cost)}
-- Total GGR: ${fmt(totals.ggr)}
-- Total NGR: ${fmt(totals.ngr)}
-- Overall Bonus/GGR: ${overallBGgr || 'N/A'}% (target ≤20%)
-- Overall ROI: ${overallRoi || 'N/A'}%
-- Threshold Breaches: ${allBreaches.length} promotion(s) over 20%
+AD-HOC PROMOTIONS (${adhoc.length}):
+${detail(adhoc)}
 
-RELOAD PROMOTIONS (${reloads.length} total):
-${promoDetail(reloads, 'Reload')}
+PROMO CODE CAMPAIGNS (${promoCodes.length}):
+${detail(promoCodes)}
 
-PROMO CODE / FUNNEL CAMPAIGNS (${funnels.length} total):
-${promoDetail(funnels, 'Funnel')}
+RELOAD PROMOTIONS (${reloads.length}):
+${detail(reloads)}
 
-ONSITE PROMOTIONS (${onsite.length} total):
-${onsite.filter(p => p.bonus_cost).map(p => `  • ${p.name} | Sub: ${p.subtype || 'N/A'} | Engaged: ${fmtN(p.unique_players_engaged)} | Rounds: ${fmtN(p.game_rounds_played)} | Turnover: ${fmt(p.total_turnover)} | Bonus: ₺${Number(p.bonus_cost || 0).toLocaleString()} | GGR: ₺${Number(p.ggr || 0).toLocaleString()} | NGR: ₺${Number(p.ngr || 0).toLocaleString()} | B/GGR: ${ratio(p.bonus_cost, p.ggr) || 'N/A'}%`).join('\n') || '  No KPI data available'}
+FUNNEL CAMPAIGNS (${funnels.length}):
+${detail(funnels)}
 
-Now write the analysis in EXACTLY this structure using these section headers:
+Write analysis using EXACTLY these section headers:
 
+## AD-HOC & ONSITE PERFORMANCE
+## PROMO CODE PERFORMANCE
 ## RELOAD PERFORMANCE
-Analyse the reload promotions. Cover: conversion rates, bonus efficiency, which value segments/lifecycle stages performed best, any threshold breaches, and whether the mechanics are driving the right behaviour.
-
-## FUNNEL & PROMO CODE PERFORMANCE  
-Analyse the funnel and promo code campaigns. Cover: conversion rates, incremental lift where available, day-level performance patterns if visible, and cost efficiency.
-
-## ONSITE PROMOTION PERFORMANCE
-Analyse the onsite promotions. Cover: engagement metrics, turnover generated, bonus efficiency, and whether the mechanics matched the objective.
-
+## FUNNEL PERFORMANCE
 ## OVERALL MONTH RATING
-Give the month an overall commercial rating: Excellent / Good / Mixed / Poor — and justify it in 2-3 sentences based on the Bonus/GGR ratio and NGR performance.
-
+Rate: Excellent / Good / Mixed / Poor. Justify in 2-3 sentences.
 ## WHAT WORKED
-3-4 bullet points — the clear wins this month.
-
+3-4 bullet points.
 ## WHAT NEEDS ATTENTION
-3-4 bullet points — underperformers, threshold breaches, or mechanics that should be reviewed.
-
+3-4 bullet points.
 ## RECOMMENDATIONS FOR NEXT MONTH
-4-5 concrete, actionable recommendations with specific reference to segments, mechanics, or offer structures. Be specific — not generic advice.
+4-5 concrete, specific recommendations.
 
-Keep each section concise but substantive. Total response should be 500-650 words.`
+Keep each section concise. Total 500-650 words.`
   }
 
   const handleGenerate = async () => {
@@ -183,53 +148,37 @@ Keep each section concise but substantive. Total response should be 500-650 word
       setAnalysis(data.result)
       setActiveTab('analysis')
     } catch (e) {
-      setError('Analysis failed: ' + e.message)
+      setError('Failed: ' + e.message)
     }
     setGenerating(false)
   }
 
-  // Parse analysis into sections
   const parseSections = (text) => {
     if (!text) return []
-    const sections = []
-    const parts = text.split(/## /)
-    parts.forEach(part => {
-      if (!part.trim()) return
+    return text.split(/## /).filter(Boolean).map(part => {
       const lines = part.trim().split('\n')
-      const title = lines[0].trim()
-      const content = lines.slice(1).join('\n').trim()
-      sections.push({ title, content })
+      return { title: lines[0].trim(), content: lines.slice(1).join('\n').trim() }
     })
-    return sections
   }
 
-  const sections = parseSections(analysis)
+  const sectionStyle = (title) => {
+    if (title.includes('WORKED')) return { bg: 'rgba(22,163,74,0.05)', border: 'rgba(22,163,74,0.2)' }
+    if (title.includes('ATTENTION')) return { bg: 'rgba(220,38,38,0.05)', border: 'rgba(220,38,38,0.2)' }
+    if (title.includes('RECOMMEND')) return { bg: 'rgba(26,110,245,0.05)', border: 'rgba(26,110,245,0.2)' }
+    if (title.includes('RATING')) return { bg: 'rgba(251,191,36,0.05)', border: 'rgba(251,191,36,0.2)' }
+    return { bg: 'var(--bg3)', border: 'var(--border)' }
+  }
 
-  const sectionIcon = (title) => {
-    if (title.includes('RELOAD')) return '🔄'
-    if (title.includes('FUNNEL') || title.includes('PROMO')) return '🎯'
-    if (title.includes('ONSITE')) return '🖥️'
-    if (title.includes('RATING')) return '⭐'
-    if (title.includes('WORKED')) return '✅'
-    if (title.includes('ATTENTION')) return '⚠️'
-    if (title.includes('RECOMMEND')) return '💡'
+  const sectionIcon = (t) => {
+    if (t.includes('AD-HOC')) return '🎯'
+    if (t.includes('PROMO CODE')) return '🏷️'
+    if (t.includes('RELOAD')) return '🔄'
+    if (t.includes('FUNNEL')) return '📡'
+    if (t.includes('RATING')) return '⭐'
+    if (t.includes('WORKED')) return '✅'
+    if (t.includes('ATTENTION')) return '⚠️'
+    if (t.includes('RECOMMEND')) return '💡'
     return '📊'
-  }
-
-  const sectionColor = (title) => {
-    if (title.includes('WORKED')) return 'rgba(22,163,74,0.06)'
-    if (title.includes('ATTENTION')) return 'rgba(220,38,38,0.06)'
-    if (title.includes('RECOMMEND')) return 'rgba(26,110,245,0.06)'
-    if (title.includes('RATING')) return 'rgba(251,191,36,0.06)'
-    return 'var(--bg3)'
-  }
-
-  const sectionBorder = (title) => {
-    if (title.includes('WORKED')) return 'rgba(22,163,74,0.2)'
-    if (title.includes('ATTENTION')) return 'rgba(220,38,38,0.2)'
-    if (title.includes('RECOMMEND')) return 'rgba(26,110,245,0.2)'
-    if (title.includes('RATING')) return 'rgba(251,191,36,0.2)'
-    return 'var(--border)'
   }
 
   return (
@@ -239,13 +188,12 @@ Keep each section concise but substantive. Total response should be 500-650 word
           <div>
             <h2>🧠 Monthly CRM Analysis — {month}</h2>
             <p style={{ fontSize: '0.78rem', color: 'var(--text2)', marginTop: '2px' }}>
-              {promos.length} promotions · {withKpis.length} with KPI data · {allBreaches.length} threshold breach{allBreaches.length !== 1 ? 'es' : ''}
+              {domainFilter && domainFilter !== 'All' ? domainFilter : 'All Domains'} · {filtered.length} promotions · {withKpis.length} with KPI data · {allBreaches.length} threshold breach{allBreaches.length !== 1 ? 'es' : ''}
             </p>
           </div>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
-        {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', padding: '0 24px', background: 'var(--bg2)' }}>
           {['overview', 'analysis'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={{
@@ -261,56 +209,47 @@ Keep each section concise but substantive. Total response should be 500-650 word
         </div>
 
         <div className="modal-body">
-
           {activeTab === 'overview' && (
             <>
-              {/* Overall KPIs */}
-              <div className="section-heading">Month Totals</div>
-              <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', marginBottom: '20px' }}>
-                <div className="stat-card"><div className="stat-label">Promotions</div><div className="stat-value">{promos.length}</div></div>
+              <div className="section-heading">Month Totals{domainFilter && domainFilter !== 'All' ? ` — ${domainFilter}` : ''}</div>
+              <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', marginBottom: '18px' }}>
+                <div className="stat-card"><div className="stat-label">Promotions</div><div className="stat-value">{filtered.length}</div></div>
                 <div className="stat-card"><div className="stat-label">Targeted</div><div className="stat-value">{fmtN(totals.targeted)}</div></div>
                 <div className="stat-card"><div className="stat-label">Depositors</div><div className="stat-value">{fmtN(totals.depositors)}</div></div>
                 <div className="stat-card"><div className="stat-label">Bonus Cost</div><div className="stat-value negative">{fmt(totals.bonus_cost)}</div></div>
                 <div className="stat-card"><div className="stat-label">GGR</div><div className="stat-value">{fmt(totals.ggr)}</div></div>
                 <div className="stat-card"><div className="stat-label">NGR</div><div className={`stat-value ${totals.ngr >= 0 ? 'positive' : 'negative'}`}>{fmt(totals.ngr)}</div></div>
-                <div className="stat-card">
-                  <div className="stat-label">Bonus/GGR</div>
-                  <div className="stat-value" style={{ color: ratioColor(overallBGgr) }}>{overallBGgr ? overallBGgr + '%' : '—'}</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-label">Overall ROI</div>
-                  <div className={`stat-value ${Number(overallRoi) >= 0 ? 'positive' : 'negative'}`}>{overallRoi ? overallRoi + '%' : '—'}</div>
-                </div>
+                <div className="stat-card"><div className="stat-label">Bonus/GGR</div><div className="stat-value" style={{ color: ratioColor(overallBGgr) }}>{overallBGgr ? overallBGgr + '%' : '—'}</div></div>
+                <div className="stat-card"><div className="stat-label">ROI</div><div className={`stat-value ${Number(overallRoi) >= 0 ? 'positive' : 'negative'}`}>{overallRoi ? overallRoi + '%' : '—'}</div></div>
               </div>
 
-              {/* Best / Worst */}
-              {topPerformer && worstPerformer && topPerformer.id !== worstPerformer.id && (
+              {top && worst && top.id !== worst.id && (
                 <>
                   <div className="section-heading">Highlights</div>
                   <div className="form-row" style={{ marginBottom: '16px' }}>
                     <div style={{ background: 'rgba(22,163,74,0.05)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '8px', padding: '12px 14px' }}>
                       <div style={{ fontSize: '0.68rem', color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>🏆 Top Performer</div>
-                      <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>{topPerformer.name}</div>
-                      <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--success)', fontSize: '0.85rem' }}>NGR: {fmt(topPerformer.ngr)}</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>{top.name}</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--success)', fontSize: '0.85rem' }}>NGR: {fmt(top.ngr)}</div>
                     </div>
                     <div style={{ background: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '8px', padding: '12px 14px' }}>
                       <div style={{ fontSize: '0.68rem', color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>📉 Needs Review</div>
-                      <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>{worstPerformer.name}</div>
-                      <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--danger)', fontSize: '0.85rem' }}>NGR: {fmt(worstPerformer.ngr)}</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>{worst.name}</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--danger)', fontSize: '0.85rem' }}>NGR: {fmt(worst.ngr)}</div>
                     </div>
                   </div>
                 </>
               )}
 
-              {/* By category */}
               <div className="section-heading">By Category</div>
+              <CategoryBlock title="Ad-Hoc Promotions" icon="🎯" promos={adhoc} color="#e8a020" />
+              <CategoryBlock title="Promo Code Campaigns" icon="🏷️" promos={promoCodes} color="#16a34a" />
               <CategoryBlock title="Reload Promotions" icon="🔄" promos={reloads} color="#1a6ef5" />
-              <CategoryBlock title="Promo Code / Funnel Campaigns" icon="🎯" promos={funnels} color="#e8a020" />
-              <CategoryBlock title="Onsite Promotions" icon="🖥️" promos={onsite} color="#0ea5e9" />
+              <CategoryBlock title="Funnel Campaigns" icon="📡" promos={funnels} color="#7c3aed" />
 
-              <div style={{ marginTop: '20px', textAlign: 'center' }}>
+              <div style={{ textAlign: 'center', marginTop: '20px' }}>
                 <button className="btn-analysis" style={{ padding: '12px 28px', fontSize: '0.9rem' }} onClick={handleGenerate} disabled={generating || withKpis.length === 0}>
-                  {generating ? <><span className="spinner" style={{ marginRight: '10px' }} />Generating full analysis…</> : '🧠 Generate Full Monthly Analysis'}
+                  {generating ? <><span className="spinner" style={{ marginRight: '10px' }} />Generating…</> : '🧠 Generate Full Monthly Analysis'}
                 </button>
                 {withKpis.length === 0 && <p style={{ fontSize: '0.78rem', color: 'var(--text3)', marginTop: '8px' }}>Enter KPI data on at least one promotion first</p>}
                 {error && <p style={{ fontSize: '0.78rem', color: 'var(--danger)', marginTop: '8px' }}>{error}</p>}
@@ -329,39 +268,31 @@ Keep each section concise but substantive. Total response should be 500-650 word
                 </div>
               ) : (
                 <>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
                     <button className="btn-ghost" style={{ fontSize: '0.78rem' }} onClick={handleGenerate} disabled={generating}>
                       {generating ? 'Regenerating…' : '↺ Regenerate'}
                     </button>
                   </div>
-                  {sections.map((s, i) => (
-                    <div key={i} style={{
-                      background: sectionColor(s.title),
-                      border: `1px solid ${sectionBorder(s.title)}`,
-                      borderRadius: '10px',
-                      padding: '14px 16px',
-                      marginBottom: '12px',
-                    }}>
-                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {sectionIcon(s.title)} {s.title}
+                  {parseSections(analysis).map((s, i) => {
+                    const st = sectionStyle(s.title)
+                    return (
+                      <div key={i} style={{ background: st.bg, border: `1px solid ${st.border}`, borderRadius: '10px', padding: '14px 16px', marginBottom: '10px' }}>
+                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', marginBottom: '8px' }}>
+                          {sectionIcon(s.title)} {s.title}
+                        </div>
+                        <div style={{ fontSize: '0.83rem', color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{s.content}</div>
                       </div>
-                      <div style={{ fontSize: '0.83rem', color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-                        {s.content}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                   {error && <p style={{ fontSize: '0.78rem', color: 'var(--danger)', marginTop: '8px' }}>{error}</p>}
                 </>
               )}
             </>
           )}
-
         </div>
         <div className="modal-footer">
           <button className="btn-ghost" onClick={onClose}>Close</button>
-          {activeTab === 'overview' && analysis && (
-            <button className="btn-secondary" onClick={() => setActiveTab('analysis')}>View Analysis →</button>
-          )}
+          {activeTab === 'overview' && analysis && <button className="btn-secondary" onClick={() => setActiveTab('analysis')}>View Analysis →</button>}
         </div>
       </div>
     </div>
