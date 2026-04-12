@@ -23,6 +23,7 @@ export default function FunnelUpload({ onClose, onSuccess }) {
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
+  const [importProgress, setImportProgress] = useState('')
   const fileRef = useRef()
 
   const handleFile = async (f) => {
@@ -77,9 +78,13 @@ export default function FunnelUpload({ onClose, onSuccess }) {
   }
 
   const handleImport = async () => {
-    if (!preview || !date) return
+    if (!preview || !date) {
+      setError('Please select a date before importing')
+      return
+    }
     setImporting(true)
     setError(null)
+    setImportProgress('Preparing records…')
 
     try {
       const toInsert = preview.filter(r => r.funnel_label).map(r => ({
@@ -92,16 +97,20 @@ export default function FunnelUpload({ onClose, onSuccess }) {
         control_responders: r.control_responders,
       }))
 
-      // Delete existing records for this date first (upsert by date + target_group)
-      await supabase.from('funnel_daily').delete().eq('data_date', date)
+      setImportProgress(`Clearing existing data for ${date}…`)
+      const { error: delErr } = await supabase.from('funnel_daily').delete().eq('data_date', date)
+      if (delErr) throw new Error('Delete failed: ' + delErr.message)
 
+      setImportProgress(`Inserting ${toInsert.length} records into database…`)
       const { error: insertErr } = await supabase.from('funnel_daily').insert(toInsert)
-      if (insertErr) throw new Error(insertErr.message)
+      if (insertErr) throw new Error('Insert failed: ' + insertErr.message)
 
+      setImportProgress('Done!')
       setResult({ imported: toInsert.length, skipped: preview.filter(r => !r.funnel_label).length })
       onSuccess && onSuccess(date)
     } catch (e) {
       setError('Import failed: ' + e.message)
+      setImportProgress('')
     }
     setImporting(false)
   }
@@ -254,11 +263,24 @@ export default function FunnelUpload({ onClose, onSuccess }) {
           )}
 
         </div>
+        {importing && (
+          <div style={{ padding: '0 24px 12px' }}>
+            <div style={{ height: '4px', background: 'var(--bg3)', borderRadius: '2px', overflow: 'hidden', marginBottom: '8px' }}>
+              <div style={{ height: '100%', background: 'var(--accent)', borderRadius: '2px', animation: 'progressPulse 1.2s ease-in-out infinite' }} />
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--accent)', fontFamily: 'var(--font-mono)', textAlign: 'center' }}>
+              {importProgress}
+            </div>
+          </div>
+        )}
+
         <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose}>{result ? 'Close' : 'Cancel'}</button>
+          <button className="btn-ghost" onClick={onClose} disabled={importing}>{result ? 'Close' : 'Cancel'}</button>
           {preview && !result && (
             <button className="btn-primary" onClick={handleImport} disabled={importing || mapping.matched === 0}>
-              {importing ? <><span className="spinner" style={{ marginRight: '8px' }} />Importing…</> : `Import ${mapping.matched} Records`}
+              {importing
+                ? <><span className="spinner" style={{ marginRight: '8px' }} />{importProgress || 'Importing…'}</>
+                : `Import ${mapping.matched} Records`}
             </button>
           )}
         </div>

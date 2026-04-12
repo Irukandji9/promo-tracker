@@ -445,3 +445,10 @@ input[type="checkbox"] {
 /* Extra tags */
 .tag-obj { background: rgba(99,102,241,0.08); color: #4338ca; border: 1px solid rgba(99,102,241,0.2); }
 .tag-optin { background: rgba(217,119,6,0.08); color: var(--warning); border: 1px solid rgba(217,119,6,0.2); }
+
+/* Progress bar animation */
+@keyframes progressPulse {
+  0% { width: 15%; margin-left: 0; }
+  50% { width: 60%; margin-left: 20%; }
+  100% { width: 15%; margin-left: 85%; }
+}

@@ -112,10 +112,16 @@ export default function ReloadUpload({ onClose, onSuccess }) {
     setLoading(false)
   }
 
+  const [importProgress, setImportProgress] = useState('')
+
   const handleImport = async () => {
-    if (!preview || !rangeStart || !rangeEnd) return alert('Please confirm the date range before importing')
+    if (!preview || !rangeStart || !rangeEnd) {
+      setError('Please confirm the date range before importing')
+      return
+    }
     setImporting(true)
     setError(null)
+    setImportProgress('Preparing records…')
 
     try {
       const toInsert = preview.filter(r => r.decoded_label).map(r => ({
@@ -133,16 +139,20 @@ export default function ReloadUpload({ onClose, onSuccess }) {
         control_responders: r.control_responders,
       }))
 
-      // Delete existing for this range first
-      await supabase.from('reload_daily').delete().eq('range_start', rangeStart).eq('range_end', rangeEnd)
+      setImportProgress(`Clearing existing data for ${rangeStart} → ${rangeEnd}…`)
+      const { error: delErr } = await supabase.from('reload_daily').delete().eq('range_start', rangeStart).eq('range_end', rangeEnd)
+      if (delErr) throw new Error('Delete failed: ' + delErr.message)
 
+      setImportProgress(`Inserting ${toInsert.length} records into database…`)
       const { error: insertErr } = await supabase.from('reload_daily').insert(toInsert)
-      if (insertErr) throw new Error(insertErr.message)
+      if (insertErr) throw new Error('Insert failed: ' + insertErr.message)
 
+      setImportProgress('Done!')
       setResult({ imported: toInsert.length, skipped: preview.filter(r => !r.decoded_label).length, rangeStart, rangeEnd })
       onSuccess && onSuccess({ rangeStart, rangeEnd })
     } catch (e) {
       setError('Import failed: ' + e.message)
+      setImportProgress('')
     }
     setImporting(false)
   }
@@ -336,11 +346,25 @@ export default function ReloadUpload({ onClose, onSuccess }) {
           )}
 
         </div>
+        {/* Progress bar */}
+        {importing && (
+          <div style={{ padding: '0 24px 12px' }}>
+            <div style={{ height: '4px', background: 'var(--bg3)', borderRadius: '2px', overflow: 'hidden', marginBottom: '8px' }}>
+              <div style={{ height: '100%', background: 'var(--accent)', borderRadius: '2px', animation: 'progressPulse 1.2s ease-in-out infinite' }} />
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--accent)', fontFamily: 'var(--font-mono)', textAlign: 'center' }}>
+              {importProgress}
+            </div>
+          </div>
+        )}
+
         <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose}>{result ? 'Close' : 'Cancel'}</button>
+          <button className="btn-ghost" onClick={onClose} disabled={importing}>{result ? 'Close' : 'Cancel'}</button>
           {preview && !result && (
             <button className="btn-primary" onClick={handleImport} disabled={importing || matchSummary.matched === 0 || !rangeStart || !rangeEnd}>
-              {importing ? <><span className="spinner" style={{ marginRight: '8px' }} />Importing…</> : `Import ${matchSummary.matched} Records`}
+              {importing
+                ? <><span className="spinner" style={{ marginRight: '8px' }} />{importProgress || 'Importing…'}</>
+                : `Import ${matchSummary.matched} Records`}
             </button>
           )}
         </div>
