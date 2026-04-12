@@ -62,6 +62,10 @@ export default function App({ session }) {
   const [expandedRow, setExpandedRow] = useState(null)
   const [showFunnelUpload, setShowFunnelUpload] = useState(false)
   const [showReloadUpload, setShowReloadUpload] = useState(false)
+  const [reloadData, setReloadData] = useState([])
+  const [funnelData, setFunnelData] = useState([])
+  const [reloadDateRanges, setReloadDateRanges] = useState([])
+  const [selectedReloadRange, setSelectedReloadRange] = useState(null)
 
   const notify = (msg, type = 'success') => setToast({ msg, type })
 
@@ -81,6 +85,31 @@ export default function App({ session }) {
   }, [selectedMonth])
 
   useEffect(() => { fetchPromos() }, [fetchPromos])
+
+  const fetchReloadData = useCallback(async () => {
+    const { data } = await supabase
+      .from('reload_daily')
+      .select('*')
+      .order('range_start', { ascending: false })
+    if (data) {
+      setReloadData(data)
+      const ranges = [...new Set(data.map(r => `${r.range_start}||${r.range_end}`))]
+        .map(r => { const [s, e] = r.split('||'); return { start: s, end: e } })
+      setReloadDateRanges(ranges)
+      if (ranges.length > 0 && !selectedReloadRange) setSelectedReloadRange(ranges[0])
+    }
+  }, [])
+
+  const fetchFunnelData = useCallback(async () => {
+    const { data } = await supabase
+      .from('funnel_daily')
+      .select('*')
+      .order('data_date', { ascending: false })
+    if (data) setFunnelData(data)
+  }, [])
+
+  useEffect(() => { fetchReloadData() }, [fetchReloadData])
+  useEffect(() => { fetchFunnelData() }, [fetchFunnelData])
 
   useEffect(() => {
     try {
@@ -483,6 +512,26 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
               {tabPromos.map(p => <PromoCardCompact key={p.id} promo={p} onEdit={() => { setEditPromo(p); setShowForm(true) }} onKpi={() => setKpiPromo(p)} onDelete={() => handleDelete(p.id)} onDuplicate={() => handleDuplicate(p)} />)}
             </div>
+
+            {activeTab === 'Reload' && reloadDateRanges.length > 0 && (
+              <div style={{ marginTop: '28px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                  <div className="section-heading" style={{ margin: 0 }}>Imported Reload Data</div>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {reloadDateRanges.map(r => (
+                      <button key={r.start + r.end} onClick={() => setSelectedReloadRange(r)} style={{
+                        padding: '3px 10px', borderRadius: '20px', fontSize: '0.74rem', fontWeight: 500,
+                        border: '1px solid', cursor: 'pointer',
+                        background: selectedReloadRange && selectedReloadRange.start === r.start && selectedReloadRange.end === r.end ? 'var(--accent)' : 'transparent',
+                        borderColor: selectedReloadRange && selectedReloadRange.start === r.start && selectedReloadRange.end === r.end ? 'var(--accent)' : 'var(--border)',
+                        color: selectedReloadRange && selectedReloadRange.start === r.start && selectedReloadRange.end === r.end ? '#fff' : 'var(--text2)',
+                      }}>{r.start} to {r.end}</button>
+                    ))}
+                  </div>
+                </div>
+                <ReloadDataTable data={reloadData.filter(r => selectedReloadRange && r.range_start === selectedReloadRange.start && r.range_end === selectedReloadRange.end)} />
+              </div>
+            )}
           </>
         )}
       </main>
@@ -491,8 +540,8 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
       {showForm && <PromoForm promo={editPromo} onSave={handleSavePromo} onClose={() => { setShowForm(false); setEditPromo(null) }} />}
       {kpiPromo && <KpiForm promo={promos.find(p => p.id === kpiPromo.id) || kpiPromo} onSave={handleSaveKpi} onClose={() => setKpiPromo(null)} onAnalyse={handleAnalyse} />}
       {showAnalysis && <MonthlyAnalysis promos={promos} month={selectedMonth} monthEvents={monthEvents} domainFilter={domainFilter} onClose={() => setShowAnalysis(false)} />}
-      {showFunnelUpload && <FunnelUpload onClose={() => setShowFunnelUpload(false)} onSuccess={() => { setShowFunnelUpload(false) }} />}
-      {showReloadUpload && <ReloadUpload onClose={() => setShowReloadUpload(false)} onSuccess={() => { setShowReloadUpload(false) }} />}
+      {showFunnelUpload && <FunnelUpload onClose={() => setShowFunnelUpload(false)} onSuccess={() => { fetchFunnelData() }} />}
+      {showReloadUpload && <ReloadUpload onClose={() => setShowReloadUpload(false)} onSuccess={() => { fetchReloadData() }} />}
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   )
@@ -560,6 +609,99 @@ function PromoCardCompact({ promo, onEdit, onKpi, onDelete, onDuplicate }) {
       <button className="btn-secondary" style={{ width: '100%', fontSize: '0.78rem', padding: '7px' }} onClick={onKpi}>
         {hasKpis ? '📊 Update KPI Results' : '📊 Enter KPI Results'}
       </button>
+    </div>
+  )
+}
+
+
+// Inline reload data table component
+function ReloadDataTable({ data }) {
+  if (!data || data.length === 0) return (
+    <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text3)', fontSize: '0.82rem' }}>No data for this period</div>
+  )
+
+  const fmtN = v => v ? Number(v).toLocaleString('tr-TR') : '0'
+  const conv = (resp, targ) => targ > 0 ? ((resp / targ) * 100).toFixed(1) + '%' : '—'
+  const lift = (tResp, tTarg, cResp, cTarg) => {
+    if (!tTarg || !cTarg || cTarg === 0) return null
+    const l = ((tResp / tTarg) - (cResp / cTarg)) * 100
+    return l
+  }
+
+  const VALUE_ORDER = ['HV', 'MV', 'LHV', 'LLV', 'NV', 'EV', '']
+  const LC_ORDER = ['Active', 'Churned Short Lapse', 'Churned Long Lapse', 'OTD', 'Dormant', 'Unknown']
+
+  const grouped = data.reduce((acc, r) => {
+    const key = r.lifecycle || 'Unknown'
+    if (!acc[key]) acc[key] = []
+    acc[key].push(r)
+    return acc
+  }, {})
+
+  const totals = data.reduce((acc, r) => ({
+    targeted: acc.targeted + (r.targeted_customers || 0),
+    control: acc.control + (r.control_customers || 0),
+    responders: acc.responders + (r.targeted_responders || 0),
+    ctrl_resp: acc.ctrl_resp + (r.control_responders || 0),
+  }), { targeted: 0, control: 0, responders: 0, ctrl_resp: 0 })
+
+  return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+      {/* Totals bar */}
+      <div style={{ background: 'var(--bg3)', padding: '10px 16px', display: 'flex', gap: '24px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+        <div><span style={{ fontSize: '0.68rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total Targeted </span><span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{fmtN(totals.targeted)}</span></div>
+        <div><span style={{ fontSize: '0.68rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Control </span><span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{fmtN(totals.control)}</span></div>
+        <div><span style={{ fontSize: '0.68rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Responders </span><span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--success)' }}>{fmtN(totals.responders)}</span></div>
+        <div><span style={{ fontSize: '0.68rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Overall Conv </span><span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent)' }}>{conv(totals.responders, totals.targeted)}</span></div>
+        <div><span style={{ fontSize: '0.68rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Segments </span><span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{data.length}</span></div>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+          <thead>
+            <tr style={{ background: 'var(--bg3)' }}>
+              {['Segment', 'Label', 'Product', 'Value', 'Reminder', 'Targeted', 'Control', 'Responders', 'Conv %', 'Ctrl Conv %', 'Lift'].map(h => (
+                <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text2)', fontWeight: 500, fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {LC_ORDER.filter(lc => grouped[lc]).map(lc => (
+              <React.Fragment key={lc}>
+                <tr>
+                  <td colSpan={11} style={{ padding: '6px 12px', background: 'rgba(26,110,245,0.04)', fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '1px solid var(--border)', borderTop: '1px solid var(--border)' }}>
+                    {lc}
+                  </td>
+                </tr>
+                {[...grouped[lc]].sort((a, b) => VALUE_ORDER.indexOf(a.value_segment) - VALUE_ORDER.indexOf(b.value_segment)).map((r, i) => {
+                  const liftVal = lift(r.targeted_responders, r.targeted_customers, r.control_responders, r.control_customers)
+                  const ctrlConv = r.control_customers > 0 ? ((r.control_responders / r.control_customers) * 100).toFixed(1) + '%' : '—'
+                  return (
+                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text2)' }}>{r.target_group}</td>
+                      <td style={{ padding: '8px 12px', fontSize: '0.76rem', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.decoded_label}</td>
+                      <td style={{ padding: '8px 12px', fontSize: '0.75rem', color: 'var(--text2)' }}>{r.product || '—'}</td>
+                      <td style={{ padding: '8px 12px' }}>
+                        {r.value_segment ? <span style={{ fontSize: '0.68rem', padding: '1px 7px', borderRadius: '4px', background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text2)', fontWeight: 600 }}>{r.value_segment}</span> : '—'}
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>{r.is_reminder ? <span style={{ fontSize: '0.66rem', background: 'rgba(251,191,36,0.12)', color: 'var(--warning)', padding: '1px 6px', borderRadius: '4px' }}>REM</span> : ''}</td>
+                      <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)' }}>{fmtN(r.targeted_customers)}</td>
+                      <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', color: 'var(--text2)' }}>{fmtN(r.control_customers)}</td>
+                      <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--success)' }}>{fmtN(r.targeted_responders)}</td>
+                      <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontWeight: 600 }}>{conv(r.targeted_responders, r.targeted_customers)}</td>
+                      <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', color: 'var(--text2)' }}>{ctrlConv}</td>
+                      <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 600, color: liftVal === null ? 'var(--text3)' : liftVal > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                        {liftVal !== null ? `${liftVal > 0 ? '+' : ''}${liftVal.toFixed(1)}pp` : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
