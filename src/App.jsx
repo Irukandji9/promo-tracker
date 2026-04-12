@@ -5,6 +5,7 @@ import KpiForm from './components/KpiForm'
 import MonthlyAnalysis from './components/MonthlyAnalysis'
 import FunnelUpload from './components/FunnelUpload'
 import ReloadUpload from './components/ReloadUpload'
+import ReloadDashboard from './components/ReloadDashboard'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const currentYear = new Date().getFullYear()
@@ -383,20 +384,45 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
             <p style={{ marginTop: '14px', fontSize: '0.85rem' }}>Loading…</p>
           </div>
         ) : tabPromos.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">📭</div>
-            <h3>{promos.length === 0 ? `No promotions for ${selectedMonth}` : `No ${activeTab} promotions`}</h3>
-            <p style={{ marginBottom: '20px' }}>Start by adding a promotion.</p>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              {activeTab === 'Funnel' && (
-                <button className="btn-analysis" onClick={() => setShowFunnelUpload(true)}>📡 Upload Optimove CSV</button>
-              )}
-              {activeTab === 'Reload' && (
-                <button className="btn-analysis" onClick={() => setShowReloadUpload(true)}>🔄 Upload Reload CSV</button>
-              )}
-              <button className="btn-primary" onClick={() => { setEditPromo(null); setShowForm(true) }}>+ Add Promotion</button>
+          <>
+            <div className="empty-state">
+              <div className="empty-icon">📭</div>
+              <h3>{promos.length === 0 ? `No promotions for ${selectedMonth}` : `No ${activeTab} promotions`}</h3>
+              <p style={{ marginBottom: '20px' }}>Start by adding a promotion.</p>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                {activeTab === 'Funnel' && (
+                  <button className="btn-analysis" onClick={() => setShowFunnelUpload(true)}>📡 Upload Optimove CSV</button>
+                )}
+                {activeTab === 'Reload' && (
+                  <button className="btn-analysis" onClick={() => setShowReloadUpload(true)}>🔄 Upload Reload CSV</button>
+                )}
+                <button className="btn-primary" onClick={() => { setEditPromo(null); setShowForm(true) }}>+ Add Promotion</button>
+              </div>
             </div>
-          </div>
+            {activeTab === 'Reload' && reloadDateRanges.length > 0 && (
+              <div style={{ marginTop: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                  <div className="section-heading" style={{ margin: 0 }}>Imported Reload Data</div>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {reloadDateRanges.map(r => (
+                      <button key={r.start + r.end} onClick={() => setSelectedReloadRange(r)} style={{
+                        padding: '3px 10px', borderRadius: '20px', fontSize: '0.74rem', fontWeight: 500,
+                        border: '1px solid', cursor: 'pointer',
+                        background: selectedReloadRange && selectedReloadRange.start === r.start && selectedReloadRange.end === r.end ? 'var(--accent)' : 'transparent',
+                        borderColor: selectedReloadRange && selectedReloadRange.start === r.start && selectedReloadRange.end === r.end ? 'var(--accent)' : 'var(--border)',
+                        color: selectedReloadRange && selectedReloadRange.start === r.start && selectedReloadRange.end === r.end ? '#fff' : 'var(--text2)',
+                      }}>{r.start} to {r.end}</button>
+                    ))}
+                  </div>
+                  <button className="btn-analysis" style={{ fontSize: '0.78rem', padding: '5px 12px', marginLeft: 'auto' }} onClick={() => setShowReloadUpload(true)}>🔄 Upload New CSV</button>
+                </div>
+                <ReloadDataTable data={reloadData.filter(r => selectedReloadRange && r.range_start === selectedReloadRange.start && r.range_end === selectedReloadRange.end)} />
+              </div>
+            )}
+          </>
+        ) : activeTab === 'Reload' ? (
+          /* RELOAD DASHBOARD */
+          <ReloadDashboard onUpload={() => setShowReloadUpload(true)} />
         ) : activeTab === 'Overview' ? (
           /* OVERVIEW TABLE */
           <>
