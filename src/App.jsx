@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import PromoForm from './components/PromoForm'
 import KpiForm from './components/KpiForm'
 import MonthlyAnalysis from './components/MonthlyAnalysis'
+import FunnelUpload from './components/FunnelUpload'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const currentYear = new Date().getFullYear()
@@ -58,6 +59,7 @@ export default function App({ session }) {
   const [editingEvents, setEditingEvents] = useState(false)
   const [eventsMap, setEventsMap] = useState({})
   const [expandedRow, setExpandedRow] = useState(null)
+  const [showFunnelUpload, setShowFunnelUpload] = useState(false)
 
   const notify = (msg, type = 'success') => setToast({ msg, type })
 
@@ -454,7 +456,14 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
                 <span style={{ fontSize: '0.76rem', color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>{tabPromos.length} promotion{tabPromos.length !== 1 ? 's' : ''}</span>
                 {Object.entries(statusCounts).map(([s, c]) => <span key={s} className={`tag tag-${s}`}>{c} {s}</span>)}
               </div>
-              <button className="btn-primary" style={{ fontSize: '0.8rem', padding: '7px 14px' }} onClick={() => { setEditPromo(null); setShowForm(true) }}>+ New {activeTab}</button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {activeTab === 'Funnel' && (
+                  <button className="btn-analysis" style={{ fontSize: '0.8rem', padding: '7px 14px' }} onClick={() => setShowFunnelUpload(true)}>
+                    📡 Upload Optimove CSV
+                  </button>
+                )}
+                <button className="btn-primary" style={{ fontSize: '0.8rem', padding: '7px 14px' }} onClick={() => { setEditPromo(null); setShowForm(true) }}>+ New {activeTab}</button>
+              </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
               {tabPromos.map(p => <PromoCardCompact key={p.id} promo={p} onEdit={() => { setEditPromo(p); setShowForm(true) }} onKpi={() => setKpiPromo(p)} onDelete={() => handleDelete(p.id)} onDuplicate={() => handleDuplicate(p)} />)}
@@ -467,6 +476,7 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
       {showForm && <PromoForm promo={editPromo} onSave={handleSavePromo} onClose={() => { setShowForm(false); setEditPromo(null) }} />}
       {kpiPromo && <KpiForm promo={promos.find(p => p.id === kpiPromo.id) || kpiPromo} onSave={handleSaveKpi} onClose={() => setKpiPromo(null)} onAnalyse={handleAnalyse} />}
       {showAnalysis && <MonthlyAnalysis promos={promos} month={selectedMonth} monthEvents={monthEvents} domainFilter={domainFilter} onClose={() => setShowAnalysis(false)} />}
+      {showFunnelUpload && <FunnelUpload onClose={() => setShowFunnelUpload(false)} onSuccess={() => { setShowFunnelUpload(false) }} />}
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   )
