@@ -135,13 +135,19 @@ export default function ReloadDashboard({ onUpload }) {
 
   useEffect(() => { fetchAll() }, [])
 
+  const [fetchError, setFetchError] = useState(null)
+
   const fetchAll = async () => {
     setLoading(true)
-    const [{ data: rd }, { data: td }] = await Promise.all([
+    setFetchError(null)
+    const [{ data: rd, error: rdErr }, { data: td, error: tdErr }] = await Promise.all([
       supabase.from('reload_daily').select('*').order('range_start', { ascending: true }),
       supabase.from('reload_reporting_tags').select('*'),
     ])
+    if (rdErr) { setFetchError('reload_daily error: ' + rdErr.message); setLoading(false); return }
+    if (tdErr) { setFetchError('reload_reporting_tags error: ' + tdErr.message); setLoading(false); return }
     if (rd) setAllData(rd)
+    else setAllData([])
     if (td) { const t = {}; td.forEach(r => { t[r.target_group] = r.reporting_tag }); setTags(t) }
     setLoading(false)
   }
@@ -199,6 +205,15 @@ export default function ReloadDashboard({ onUpload }) {
     <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text2)' }}>
       <span className="spinner" style={{ width: '24px', height: '24px', borderWidth: '3px' }} />
       <p style={{ marginTop: '12px', fontSize: '0.85rem' }}>Loading reload data…</p>
+    </div>
+  )
+
+  if (fetchError) return (
+    <div style={{ background: 'rgba(220,38,38,0.07)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 'var(--radius-lg)', padding: '20px', margin: '20px 0' }}>
+      <div style={{ fontWeight: 700, color: 'var(--danger)', marginBottom: '8px' }}>⚠️ Database Error</div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', color: 'var(--danger)' }}>{fetchError}</div>
+      <div style={{ fontSize: '0.78rem', color: 'var(--text2)', marginTop: '10px' }}>This usually means the table doesn't exist or RLS is blocking access. Check Supabase.</div>
+      <button className="btn-ghost" style={{ marginTop: '12px', fontSize: '0.78rem' }} onClick={fetchAll}>Retry</button>
     </div>
   )
 
