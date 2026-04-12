@@ -356,7 +356,12 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
             <div className="empty-icon">📭</div>
             <h3>{promos.length === 0 ? `No promotions for ${selectedMonth}` : `No ${activeTab} promotions`}</h3>
             <p style={{ marginBottom: '20px' }}>Start by adding a promotion.</p>
-            <button className="btn-primary" onClick={() => { setEditPromo(null); setShowForm(true) }}>+ Add Promotion</button>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {activeTab === 'Funnel' && (
+                <button className="btn-analysis" onClick={() => setShowFunnelUpload(true)}>📡 Upload Optimove CSV</button>
+              )}
+              <button className="btn-primary" onClick={() => { setEditPromo(null); setShowForm(true) }}>+ Add Promotion</button>
+            </div>
           </div>
         ) : activeTab === 'Overview' ? (
           /* OVERVIEW TABLE */
