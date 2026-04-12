@@ -174,6 +174,35 @@ export default function ReloadUpload({ onClose, onSuccess }) {
 
   const lifecycleOrder = ['Active', 'Churned Short Lapse', 'Churned Long Lapse', 'OTD', 'Dormant', 'Unknown']
 
+  // Show full-screen success state instead of modal
+  if (result) return (
+    <div className="modal-overlay">
+      <div className="modal" style={{ maxWidth: '460px', textAlign: 'center', padding: '0' }}>
+        <div style={{ padding: '40px 32px' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.2rem', marginBottom: '10px' }}>Import Successful!</div>
+          <div style={{ fontSize: '0.9rem', color: 'var(--text2)', marginBottom: '6px' }}>
+            <strong style={{ color: 'var(--success)', fontSize: '1.1rem' }}>{result.imported}</strong> reload segments imported
+          </div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', color: 'var(--text2)', background: 'var(--bg3)', padding: '8px 16px', borderRadius: 'var(--radius)', margin: '12px 0', display: 'inline-block' }}>
+            {result.rangeStart} → {result.rangeEnd}
+          </div>
+          {result.skipped > 0 && (
+            <div style={{ fontSize: '0.8rem', color: 'var(--warning)', marginBottom: '8px' }}>
+              {result.skipped} segments skipped (unmatched target groups)
+            </div>
+          )}
+          <div style={{ fontSize: '0.78rem', color: 'var(--text3)', marginBottom: '24px' }}>
+            Close this window — the Reload tab will refresh automatically.
+          </div>
+          <button className="btn-primary" style={{ padding: '12px 32px', fontSize: '0.9rem' }} onClick={onClose}>
+            Close & View Data
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal modal-lg" style={{ maxWidth: '820px' }}>
@@ -334,18 +363,8 @@ export default function ReloadUpload({ onClose, onSuccess }) {
           )}
 
           {/* Success */}
-          {result && (
-            <div style={{ background: 'rgba(22,163,74,0.07)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: 'var(--radius-lg)', padding: '20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>✅</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', marginBottom: '6px' }}>Import successful</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>
-                {result.imported} reload segments imported for {result.rangeStart} → {result.rangeEnd}
-                {result.skipped > 0 && ` · ${result.skipped} skipped`}
-              </div>
-            </div>
-          )}
-
         </div>
+
         {/* Progress bar */}
         {importing && (
           <div style={{ padding: '0 24px 12px' }}>
@@ -359,7 +378,7 @@ export default function ReloadUpload({ onClose, onSuccess }) {
         )}
 
         <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose} disabled={importing}>{result ? 'Close' : 'Cancel'}</button>
+          <button className="btn-ghost" onClick={onClose} disabled={importing}>Cancel</button>
           {preview && !result && (
             <button className="btn-primary" onClick={handleImport} disabled={importing || matchSummary.matched === 0 || !rangeStart || !rangeEnd}>
               {importing
@@ -371,5 +390,10 @@ export default function ReloadUpload({ onClose, onSuccess }) {
       </div>
     </div>
   )
+}
+
+// Success overlay — shown INSTEAD of the main modal
+function SuccessScreen({ result, onClose }) {
+  return null // handled inline below
 }
 

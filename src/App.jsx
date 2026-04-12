@@ -63,6 +63,7 @@ export default function App({ session }) {
   const [expandedRow, setExpandedRow] = useState(null)
   const [showFunnelUpload, setShowFunnelUpload] = useState(false)
   const [showReloadUpload, setShowReloadUpload] = useState(false)
+  const [reloadRefreshKey, setReloadRefreshKey] = useState(0)
   const [funnelData, setFunnelData] = useState([])
 
   const notify = (msg, type = 'success') => setToast({ msg, type })
@@ -385,7 +386,7 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
           </>
         ) : activeTab === 'Reload' ? (
           /* RELOAD DASHBOARD */
-          <ReloadDashboard onUpload={() => setShowReloadUpload(true)} />
+          <ReloadDashboard key={reloadRefreshKey} onUpload={() => setShowReloadUpload(true)} />
         ) : activeTab === 'Overview' ? (
           /* OVERVIEW TABLE */
           <>
@@ -511,7 +512,7 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
       {kpiPromo && <KpiForm promo={promos.find(p => p.id === kpiPromo.id) || kpiPromo} onSave={handleSaveKpi} onClose={() => setKpiPromo(null)} onAnalyse={handleAnalyse} />}
       {showAnalysis && <MonthlyAnalysis promos={promos} month={selectedMonth} monthEvents={monthEvents} domainFilter={domainFilter} onClose={() => setShowAnalysis(false)} />}
       {showFunnelUpload && <FunnelUpload onClose={() => setShowFunnelUpload(false)} onSuccess={() => { fetchFunnelData() }} />}
-      {showReloadUpload && <ReloadUpload onClose={() => setShowReloadUpload(false)} onSuccess={() => { setShowReloadUpload(false) }} />}
+      {showReloadUpload && <ReloadUpload onClose={() => { setShowReloadUpload(false); setReloadRefreshKey(k => k + 1) }} onSuccess={() => {}} />}
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   )
