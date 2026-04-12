@@ -366,27 +366,21 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
             <span className="spinner" style={{ width: '28px', height: '28px', borderWidth: '3px' }} />
             <p style={{ marginTop: '14px', fontSize: '0.85rem' }}>Loading…</p>
           </div>
-        ) : tabPromos.length === 0 ? (
-          <>
-            <div className="empty-state">
-              <div className="empty-icon">📭</div>
-              <h3>{promos.length === 0 ? `No promotions for ${selectedMonth}` : `No ${activeTab} promotions`}</h3>
-              <p style={{ marginBottom: '20px' }}>Start by adding a promotion.</p>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                {activeTab === 'Funnel' && (
-                  <button className="btn-analysis" onClick={() => setShowFunnelUpload(true)}>📡 Upload Optimove CSV</button>
-                )}
-                {activeTab === 'Reload' && (
-                  <button className="btn-analysis" onClick={() => setShowReloadUpload(true)}>🔄 Upload Reload CSV</button>
-                )}
-                <button className="btn-primary" onClick={() => { setEditPromo(null); setShowForm(true) }}>+ Add Promotion</button>
-              </div>
-            </div>
-
-          </>
         ) : activeTab === 'Reload' ? (
-          /* RELOAD DASHBOARD */
+          /* RELOAD DASHBOARD — always shown, handles its own empty state */
           <ReloadDashboard key={reloadRefreshKey} onUpload={() => setShowReloadUpload(true)} />
+        ) : tabPromos.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">📭</div>
+            <h3>{promos.length === 0 ? `No promotions for ${selectedMonth}` : `No ${activeTab} promotions`}</h3>
+            <p style={{ marginBottom: '20px' }}>Start by adding a promotion.</p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {activeTab === 'Funnel' && (
+                <button className="btn-analysis" onClick={() => setShowFunnelUpload(true)}>📡 Upload Optimove CSV</button>
+              )}
+              <button className="btn-primary" onClick={() => { setEditPromo(null); setShowForm(true) }}>+ Add Promotion</button>
+            </div>
+          </div>
         ) : activeTab === 'Overview' ? (
           /* OVERVIEW TABLE */
           <>
