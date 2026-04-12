@@ -349,4 +349,3 @@ export default function ReloadUpload({ onClose, onSuccess }) {
   )
 }
 
-const VALUE_ORDER = ['HV', 'MV', 'LHV', 'LLV', 'NV', 'EV', '']
