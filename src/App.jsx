@@ -4,6 +4,7 @@ import PromoForm from './components/PromoForm'
 import KpiForm from './components/KpiForm'
 import MonthlyAnalysis from './components/MonthlyAnalysis'
 import FunnelUpload from './components/FunnelUpload'
+import ReloadUpload from './components/ReloadUpload'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const currentYear = new Date().getFullYear()
@@ -60,6 +61,7 @@ export default function App({ session }) {
   const [eventsMap, setEventsMap] = useState({})
   const [expandedRow, setExpandedRow] = useState(null)
   const [showFunnelUpload, setShowFunnelUpload] = useState(false)
+  const [showReloadUpload, setShowReloadUpload] = useState(false)
 
   const notify = (msg, type = 'success') => setToast({ msg, type })
 
@@ -360,6 +362,9 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
               {activeTab === 'Funnel' && (
                 <button className="btn-analysis" onClick={() => setShowFunnelUpload(true)}>📡 Upload Optimove CSV</button>
               )}
+              {activeTab === 'Reload' && (
+                <button className="btn-analysis" onClick={() => setShowReloadUpload(true)}>🔄 Upload Reload CSV</button>
+              )}
               <button className="btn-primary" onClick={() => { setEditPromo(null); setShowForm(true) }}>+ Add Promotion</button>
             </div>
           </div>
@@ -467,6 +472,11 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
                     📡 Upload Optimove CSV
                   </button>
                 )}
+                {activeTab === 'Reload' && (
+                  <button className="btn-analysis" style={{ fontSize: '0.8rem', padding: '7px 14px' }} onClick={() => setShowReloadUpload(true)}>
+                    🔄 Upload Reload CSV
+                  </button>
+                )}
                 <button className="btn-primary" style={{ fontSize: '0.8rem', padding: '7px 14px' }} onClick={() => { setEditPromo(null); setShowForm(true) }}>+ New {activeTab}</button>
               </div>
             </div>
@@ -482,6 +492,7 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
       {kpiPromo && <KpiForm promo={promos.find(p => p.id === kpiPromo.id) || kpiPromo} onSave={handleSaveKpi} onClose={() => setKpiPromo(null)} onAnalyse={handleAnalyse} />}
       {showAnalysis && <MonthlyAnalysis promos={promos} month={selectedMonth} monthEvents={monthEvents} domainFilter={domainFilter} onClose={() => setShowAnalysis(false)} />}
       {showFunnelUpload && <FunnelUpload onClose={() => setShowFunnelUpload(false)} onSuccess={() => { setShowFunnelUpload(false) }} />}
+      {showReloadUpload && <ReloadUpload onClose={() => setShowReloadUpload(false)} onSuccess={() => { setShowReloadUpload(false) }} />}
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   )
