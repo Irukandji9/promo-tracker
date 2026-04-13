@@ -65,6 +65,7 @@ export default function App({ session }) {
   const [showReloadUpload, setShowReloadUpload] = useState(false)
   const [reloadRefreshKey, setReloadRefreshKey] = useState(0)
   const [funnelData, setFunnelData] = useState([])
+  const [reloadData, setReloadData] = useState([])
 
   const notify = (msg, type = 'success') => setToast({ msg, type })
 
@@ -85,6 +86,11 @@ export default function App({ session }) {
 
   useEffect(() => { fetchPromos() }, [fetchPromos])
 
+  const fetchReloadData = useCallback(async () => {
+    const { data } = await supabase.from('reload_daily').select('*').order('range_start', { ascending: false })
+    if (data) setReloadData(data)
+  }, [])
+
   const fetchFunnelData = useCallback(async () => {
     const { data } = await supabase
       .from('funnel_daily')
@@ -93,6 +99,7 @@ export default function App({ session }) {
     if (data) setFunnelData(data)
   }, [])
 
+  useEffect(() => { fetchReloadData() }, [fetchReloadData])
   useEffect(() => { fetchFunnelData() }, [fetchFunnelData])
 
   useEffect(() => {
@@ -470,6 +477,9 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
                 </tbody>
               </table>
             </div>
+
+            {/* RELOAD DATA SUMMARY IN OVERVIEW */}
+            <ReloadOverviewSection reloadData={reloadData} />
           </>
         ) : (
           /* TYPE TAB — card grid */
@@ -578,3 +588,81 @@ function PromoCardCompact({ promo, onEdit, onKpi, onDelete, onDuplicate }) {
   )
 }
 
+
+// Reload summary for Overview tab
+function ReloadOverviewSection({ reloadData }) {
+  if (!reloadData || reloadData.length === 0) return null
+
+  const fmtN = v => v ? Number(v).toLocaleString('tr-TR') : '0'
+  const pct = (a, b) => (a > 0 && b > 0) ? ((a / b) * 100).toFixed(1) + '%' : '—'
+  const lift = (tR, tT, cR, cT) => {
+    if (!tT || !cT) return null
+    return ((tR / tT) - (cR / cT)) * 100
+  }
+
+  // Get most recent period
+  const periods = [...new Map(reloadData.map(r => [`${r.range_start}||${r.range_end}`, { start: r.range_start, end: r.range_end }])).values()]
+    .sort((a, b) => b.start.localeCompare(a.start))
+  const latest = periods[0]
+  if (!latest) return null
+
+  const latestRows = reloadData.filter(r => r.range_start === latest.start && r.range_end === latest.end && !r.is_reminder)
+  const VALUE_ORDER = ['HV', 'MV', 'LHV', 'LLV', 'NV', 'EV', '']
+
+  // Group by lifecycle+product
+  const groups = {}
+  latestRows.forEach(r => {
+    const k = `${r.lifecycle}|${r.product}`
+    if (!groups[k]) groups[k] = { lifecycle: r.lifecycle, product: r.product, rows: [] }
+    groups[k].rows.push(r)
+  })
+
+  return (
+    <div style={{ marginTop: '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+        <div className="section-heading" style={{ margin: 0 }}>🔄 Reload Data — {latest.start} to {latest.end}</div>
+        <span style={{ fontSize: '0.72rem', color: 'var(--text3)' }}>Latest period · {periods.length} total upload{periods.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+          <thead>
+            <tr style={{ background: 'var(--bg3)' }}>
+              {['Group', 'Value Seg.', 'Product', 'Targeted', 'Responders', 'Conv %', 'Ctrl Conv %', 'Lift'].map(h => (
+                <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text2)', fontWeight: 500, fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Object.values(groups).sort((a, b) => a.lifecycle.localeCompare(b.lifecycle)).map(g => {
+              const sorted = [...g.rows].sort((a, b) => VALUE_ORDER.indexOf(a.value_segment) - VALUE_ORDER.indexOf(b.value_segment))
+              return sorted.map((r, i) => {
+                const liftVal = lift(r.targeted_responders, r.targeted_customers, r.control_responders, r.control_customers)
+                const ctrlConv = pct(r.control_responders, r.control_customers)
+                return (
+                  <tr key={`${g.lifecycle}${g.product}${i}`} style={{ borderBottom: '1px solid var(--border)' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '8px 12px', fontWeight: i === 0 ? 600 : 400, color: i === 0 ? 'var(--text)' : 'var(--text3)', fontSize: '0.75rem' }}>
+                      {i === 0 ? `${g.lifecycle} ${g.product}` : ''}
+                    </td>
+                    <td style={{ padding: '8px 12px' }}>
+                      {r.value_segment ? <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'var(--bg3)', border: '1px solid var(--border)', fontWeight: 700 }}>{r.value_segment}</span> : '—'}
+                    </td>
+                    <td style={{ padding: '8px 12px', fontSize: '0.74rem', color: 'var(--text2)' }}>{r.product}</td>
+                    <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)' }}>{fmtN(r.targeted_customers)}</td>
+                    <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--success)' }}>{fmtN(r.targeted_responders)}</td>
+                    <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent)' }}>{pct(r.targeted_responders, r.targeted_customers)}</td>
+                    <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', color: 'var(--text2)' }}>{ctrlConv}</td>
+                    <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 700, color: liftVal === null ? 'var(--text3)' : liftVal > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                      {liftVal !== null ? `${liftVal > 0 ? '+' : ''}${liftVal.toFixed(1)}pp` : '—'}
+                    </td>
+                  </tr>
+                )
+              })
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}

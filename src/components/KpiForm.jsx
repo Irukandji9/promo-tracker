@@ -10,8 +10,9 @@ function getRatioStatus(bonusCost, ggr) {
 
 export default function KpiForm({ promo, onSave, onClose, onAnalyse }) {
   const type = promo?.type || 'Ad-Hoc'
-  const isOnsite = type === 'Ad-Hoc' // Ad-Hoc onsite promos use engagement metrics
-  const isDepositBased = type === 'Reload' || type === 'Funnel' || type === 'Promo Code'
+  const isPromoCode = type === 'Promo Code'
+  const isOnsite = type === 'Ad-Hoc'
+  const isDepositBased = type === 'Reload' || type === 'Funnel'
   const hasControlGroup = type === 'Reload' || type === 'Funnel'
   const hasDepositors = type !== 'Ad-Hoc'
 
@@ -92,6 +93,78 @@ export default function KpiForm({ promo, onSave, onClose, onAnalyse }) {
         </div>
         <div className="modal-body">
 
+          {/* ── PROMO CODE KPI MODE ── */}
+          {isPromoCode && (
+            <>
+              <div className="section-heading">Promo Code Results</div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Total Code Users</label>
+                  <input type="number" placeholder="e.g. 842" value={form.participants} onChange={e => set('participants', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label>Total Deposits</label>
+                  <input type="number" placeholder="e.g. 612" value={form.depositors} onChange={e => set('depositors', e.target.value)} />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>GGR (₺)</label>
+                  <input type="number" placeholder="e.g. 120000" value={form.ggr} onChange={e => set('ggr', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label>Bonus Cost (₺)</label>
+                  <input type="number" placeholder="e.g. 24000" value={form.bonus_cost} onChange={e => set('bonus_cost', e.target.value)} />
+                </div>
+              </div>
+
+              {/* Auto-calculated Bonus/GGR */}
+              {form.bonus_cost && form.ggr && (() => {
+                const ratio = ((Number(form.bonus_cost) / Number(form.ggr)) * 100).toFixed(1)
+                const status = Number(ratio) <= 20 ? { icon: '✅', label: 'Healthy', color: 'var(--success)', bg: 'rgba(22,163,74,0.07)', border: 'rgba(22,163,74,0.2)' }
+                  : Number(ratio) <= 28 ? { icon: '⚠️', label: 'Borderline', color: 'var(--warning)', bg: 'rgba(217,119,6,0.07)', border: 'rgba(217,119,6,0.2)' }
+                  : { icon: '🔴', label: 'Over Threshold', color: 'var(--danger)', bg: 'rgba(220,38,38,0.07)', border: 'rgba(220,38,38,0.2)' }
+                return (
+                  <div style={{ background: status.bg, border: `1px solid ${status.border}`, borderRadius: 'var(--radius-lg)', padding: '14px 18px', marginBottom: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>Bonus Cost / GGR</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '1.4rem', fontWeight: 700, color: status.color }}>{ratio}%</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '1.1rem', marginBottom: '3px' }}>{status.icon}</div>
+                      <div style={{ fontWeight: 700, color: status.color, fontSize: '0.88rem' }}>{status.label}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text3)' }}>Target ≤ 20%</div>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              <div className="section-heading">Notes & Status</div>
+              <div className="form-group">
+                <label>Notes</label>
+                <textarea placeholder="Observations or learnings from this promo code..." value={form.notes} onChange={e => set('notes', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select value={form.status} onChange={e => set('status', e.target.value)}>
+                  <option value="planned">Planned</option>
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
+                  <option value="analysed">Analysed</option>
+                </select>
+              </div>
+              {promo?.analysis_result && (
+                <>
+                  <div className="section-heading">AI Analysis</div>
+                  <div className="analysis-box">{promo.analysis_result}</div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* ── ALL OTHER TYPES ── */}
+          {!isPromoCode && (
+          <>
           {/* PARTICIPATION */}
           <div className="section-heading">Participation</div>
           <div className="form-row">
@@ -249,13 +322,17 @@ export default function KpiForm({ promo, onSave, onClose, onAnalyse }) {
               <div className="analysis-box">{promo.analysis_result}</div>
             </>
           )}
+          </>
+          )}
 
         </div>
         <div className="modal-footer">
           <button className="btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn-analysis" onClick={handleAnalyse} disabled={analysing || !form.bonus_cost}>
-            {analysing ? <><span className="spinner" style={{ marginRight: '8px' }} />Analysing…</> : '⚡ Run AI Analysis'}
-          </button>
+          {!isPromoCode && (
+            <button className="btn-analysis" onClick={handleAnalyse} disabled={analysing || !form.bonus_cost}>
+              {analysing ? <><span className="spinner" style={{ marginRight: '8px' }} />Analysing…</> : '⚡ Run AI Analysis'}
+            </button>
+          )}
           <button className="btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? <span className="spinner" /> : 'Save Results'}
           </button>

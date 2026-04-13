@@ -130,8 +130,11 @@ export default function ReloadDashboard({ onUpload }) {
   const [allData, setAllData] = useState([])
   const [tags, setTags] = useState({})
   const [loading, setLoading] = useState(true)
-  const [expandedGroup, setExpandedGroup] = useState(null)   // which LC+product tile is open
-  const [expandedPeriods, setExpandedPeriods] = useState({}) // which period rows show value segments
+  const [expandedGroup, setExpandedGroup] = useState(null)
+  const [expandedPeriods, setExpandedPeriods] = useState({})
+  const [analysisGroup, setAnalysisGroup] = useState(null)
+  const [analysisResult, setAnalysisResult] = useState({})
+  const [analysing, setAnalysing] = useState(null)
 
   useEffect(() => { fetchAll() }, [])
 
@@ -150,6 +153,62 @@ export default function ReloadDashboard({ onUpload }) {
     else setAllData([])
     if (td) { const t = {}; td.forEach(r => { t[r.target_group] = r.reporting_tag }); setTags(t) }
     setLoading(false)
+  }
+
+  const handleAnalyse = async (g) => {
+    const rows = groupRows(g, allData)
+    if (!rows.length) return
+    setAnalysing(g.key)
+
+    const valueRows = rows.filter(r => !r.is_reminder)
+    const tot = aggregate(rows)
+    const conv = pct(tot.responders, tot.targeted)
+    const liftVal = liftPP(tot.responders, tot.targeted, tot.ctrl_resp, tot.control)
+
+    const valueDetail = VALUE_ORDER.filter(v => v).map(v => {
+      const vRows = valueRows.filter(r => r.value_segment === v)
+      if (!vRows.length) return null
+      const vTot = aggregate(vRows)
+      const vConv = pct(vTot.responders, vTot.targeted)
+      const vLift = liftPP(vTot.responders, vTot.targeted, vTot.ctrl_resp, vTot.control)
+      return `  ${v}: ${vTot.targeted} targeted → ${vTot.responders} responders (${vConv || '—'}% conv, lift: ${vLift !== null ? (vLift > 0 ? '+' : '') + vLift.toFixed(1) + 'pp' : '—'})`
+    }).filter(Boolean).join('
+')
+
+    const prompt = `You are a senior CRM Analyst at Hepsibahis, online sports betting and casino in the Turkish market.
+
+Analyse this reload segment and give a sharp commercial assessment with specific value segment recommendations.
+
+SEGMENT: ${g.label}
+Periods analysed: ${[...new Set(rows.map(r => `${r.range_start}→${r.range_end}`))].join(', ')}
+Total targeted: ${fmt(tot.targeted)}
+Total responders: ${fmt(tot.responders)}
+Overall conversion: ${conv || '—'}%
+Incremental lift vs control: ${liftVal !== null ? (liftVal > 0 ? '+' : '') + liftVal.toFixed(1) + 'pp' : 'N/A'}
+
+Value segment breakdown:
+${valueDetail}
+
+Write a concise analysis (max 200 words, no headers, flowing text):
+1. Overall performance verdict for this lifecycle+product group
+2. Which value segments are performing well vs underperforming — be specific (e.g. "HV is converting at X% with strong lift, while LLV at Y% suggests the offer mechanic isn't resonating")
+3. One specific, actionable recommendation per underperforming segment
+Be direct and commercially focused.`
+
+    try {
+      const res = await fetch('/api/reload-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setAnalysisResult(prev => ({ ...prev, [g.key]: data.result }))
+      setAnalysisGroup(g.key)
+    } catch (e) {
+      setAnalysisResult(prev => ({ ...prev, [g.key]: 'Error: ' + e.message }))
+    }
+    setAnalysing(null)
   }
 
   const handleSaveTag = async (tg, tag) => {
@@ -274,6 +333,18 @@ export default function ReloadDashboard({ onUpload }) {
                     </div>
                   )}
                   <div style={{ marginTop: '6px', fontSize: '0.68rem', color: 'var(--text3)' }}>{periods.length} period{periods.length !== 1 ? 's' : ''} · click to expand →</div>
+                  {analysisResult[g.key] && (
+                    <div style={{ marginTop: '10px', fontSize: '0.74rem', color: '#0369a1', background: 'rgba(14,165,233,0.05)', border: '1px solid rgba(14,165,233,0.15)', borderRadius: '6px', padding: '8px 10px', lineHeight: 1.55 }}>
+                      ⚡ {analysisResult[g.key].slice(0, 160)}{analysisResult[g.key].length > 160 ? '…' : ''}
+                    </div>
+                  )}
+                  <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                    <button className="btn-analysis" style={{ fontSize: '0.72rem', padding: '5px 12px' }}
+                      onClick={e => { e.stopPropagation(); handleAnalyse(g) }}
+                      disabled={analysing === g.key}>
+                      {analysing === g.key ? <><span className="spinner" style={{ marginRight: '6px', width: '12px', height: '12px', borderWidth: '2px' }} />Analysing…</> : '⚡ Run Analysis'}
+                    </button>
+                  </div>
                 </div>
               )
             })}
