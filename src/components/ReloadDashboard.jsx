@@ -172,8 +172,7 @@ export default function ReloadDashboard({ onUpload }) {
       const vConv = pct(vTot.responders, vTot.targeted)
       const vLift = liftPP(vTot.responders, vTot.targeted, vTot.ctrl_resp, vTot.control)
       return `  ${v}: ${vTot.targeted} targeted → ${vTot.responders} responders (${vConv || '—'}% conv, lift: ${vLift !== null ? (vLift > 0 ? '+' : '') + vLift.toFixed(1) + 'pp' : '—'})`
-    }).filter(Boolean).join('
-')
+    }).filter(Boolean).join('\n')
 
     const prompt = `You are a senior CRM Analyst at Hepsibahis, online sports betting and casino in the Turkish market.
 
