@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 
 const DOMAINS = ['Hepsibahis', 'MrOyun', 'UWIN']
-const PROMO_TYPES = ['Promo Code', 'Ad-Hoc', 'Reload', 'Funnel']
+const PROMO_TYPES = ['Promo Code', 'Ad-Hoc']
 const OBJECTIVES = ['Retention', 'Reactivation', 'Acquisition']
 const REWARD_TYPES_PROMO_CODE = ['Free Bet', 'Free Spins', 'VEFA Coins', 'Casino Bonus']
 const TRIGGER_TYPES = ['Deposit Related', 'Direct Crediting']
