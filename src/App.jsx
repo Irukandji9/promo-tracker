@@ -4,6 +4,7 @@ import PromoForm from './components/PromoForm'
 import KpiForm from './components/KpiForm'
 import MonthlyAnalysis from './components/MonthlyAnalysis'
 import FunnelUpload from './components/FunnelUpload'
+import FunnelDashboard from './components/FunnelDashboard'
 import ReloadUpload from './components/ReloadUpload'
 import ReloadDashboard from './components/ReloadDashboard'
 
@@ -64,6 +65,7 @@ export default function App({ session }) {
   const [showFunnelUpload, setShowFunnelUpload] = useState(false)
   const [showReloadUpload, setShowReloadUpload] = useState(false)
   const [reloadRefreshKey, setReloadRefreshKey] = useState(0)
+  const [funnelRefreshKey, setFunnelRefreshKey] = useState(0)
   const [funnelData, setFunnelData] = useState([])
   const [reloadData, setReloadData] = useState([])
 
@@ -373,6 +375,9 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
             <span className="spinner" style={{ width: '28px', height: '28px', borderWidth: '3px' }} />
             <p style={{ marginTop: '14px', fontSize: '0.85rem' }}>Loading…</p>
           </div>
+        ) : activeTab === 'Funnel' ? (
+          /* FUNNEL DASHBOARD — always shown, handles its own empty state */
+          <FunnelDashboard key={funnelRefreshKey} onUpload={() => setShowFunnelUpload(true)} />
         ) : activeTab === 'Reload' ? (
           /* RELOAD DASHBOARD — always shown, handles its own empty state */
           <ReloadDashboard key={reloadRefreshKey} onUpload={() => setShowReloadUpload(true)} />
@@ -512,7 +517,7 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
       {showForm && <PromoForm promo={editPromo} onSave={handleSavePromo} onClose={() => { setShowForm(false); setEditPromo(null) }} />}
       {kpiPromo && <KpiForm promo={promos.find(p => p.id === kpiPromo.id) || kpiPromo} onSave={handleSaveKpi} onClose={() => setKpiPromo(null)} onAnalyse={handleAnalyse} />}
       {showAnalysis && <MonthlyAnalysis promos={promos} month={selectedMonth} monthEvents={monthEvents} domainFilter={domainFilter} onClose={() => setShowAnalysis(false)} />}
-      {showFunnelUpload && <FunnelUpload onClose={() => setShowFunnelUpload(false)} onSuccess={() => { fetchFunnelData() }} />}
+      {showFunnelUpload && <FunnelUpload onClose={() => { setShowFunnelUpload(false); setFunnelRefreshKey(k => k + 1) }} onSuccess={() => {}} />}
       {showReloadUpload && <ReloadUpload onClose={() => { setShowReloadUpload(false); setReloadRefreshKey(k => k + 1) }} onSuccess={() => {}} />}
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
     </div>
