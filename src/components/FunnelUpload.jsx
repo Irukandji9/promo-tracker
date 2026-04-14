@@ -16,9 +16,8 @@ function parseCSVLine(line, sep) {
   return result.map(v => v.replace(/^"|"$/g, '').trim())
 }
 
-function detectSep(line) {
-  const sc = (line.match(/;/g) || []).length
-  return sc > 0 ? ';' : ','
+function detectSep(firstLine) {
+  return (firstLine.match(/;/g) || []).length > 0 ? ';' : ','
 }
 
 function parseCSV(text) {
@@ -26,10 +25,9 @@ function parseCSV(text) {
   const sep = detectSep(lines[0])
   const headers = parseCSVLine(lines[0], sep)
 
-  // Only extract the columns we care about — ignore everything else
-  const TARGET_COLS = ['Target Group', 'Targeted Customers', 'Control Customers', 'Targeted Responders', 'Control Responders']
+  // Only read the 5 columns we need by position — ignore everything else
   const colIdx = {}
-  TARGET_COLS.forEach(col => {
+  REQUIRED_COLS.forEach(col => {
     const idx = headers.findIndex(h => h === col)
     if (idx !== -1) colIdx[col] = idx
   })
@@ -37,28 +35,11 @@ function parseCSV(text) {
   return lines.slice(1).map(line => {
     const vals = parseCSVLine(line, sep)
     const row = {}
-    TARGET_COLS.forEach(col => {
+    REQUIRED_COLS.forEach(col => {
       row[col] = colIdx[col] !== undefined ? (vals[colIdx[col]] || '') : ''
     })
     return row
   }).filter(r => r['Target Group']?.trim())
-}
-
-function detectSep(line) {
-  const sc = (line.match(/;/g) || []).length
-  return sc > 0 ? ';' : ','
-}
-
-function parseCSV(text) {
-  const lines = text.trim().split('\n').filter(l => l.trim())
-  const sep = detectSep(lines[0])
-  const headers = parseCSVLine(lines[0], sep)
-  return lines.slice(1).map(line => {
-    const vals = parseCSVLine(line, sep)
-    const row = {}
-    headers.forEach((h, i) => { row[h] = vals[i] || '' })
-    return row
-  }).filter(r => r['Target Group'])
 }
 
 export default function FunnelUpload({ onClose, onSuccess }) {
@@ -68,9 +49,9 @@ export default function FunnelUpload({ onClose, onSuccess }) {
   const [mapping, setMapping] = useState(null)
   const [loading, setLoading] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState('')
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
-  const [importProgress, setImportProgress] = useState('')
   const fileRef = useRef()
 
   const handleFile = async (f) => {
@@ -85,25 +66,20 @@ export default function FunnelUpload({ onClose, onSuccess }) {
       const text = await f.text()
       const rows = parseCSV(text)
 
-      // Check required columns
-      const missing = REQUIRED_COLS.filter(c => !Object.keys(rows[0] || {}).includes(c))
-      if (missing.length > 0) {
-        setError(`Missing columns: ${missing.join(', ')}`)
-        setLoading(false)
-        return
-      }
+      if (!rows.length) throw new Error('No data rows found')
 
-      // Fetch funnel mapping from Supabase
+      const missing = REQUIRED_COLS.filter(c => rows[0][c] === undefined)
+      if (missing.length > 0) throw new Error(`Missing columns: ${missing.join(', ')}`)
+
+      // Fetch funnel mapping
       const { data: funnelMap, error: mapErr } = await supabase
         .from('funnel_mapping')
         .select('target_group, funnel_label')
-
       if (mapErr) throw new Error('Could not load funnel mapping: ' + mapErr.message)
 
       const lookupMap = {}
       funnelMap.forEach(r => { lookupMap[r.target_group.trim()] = r.funnel_label })
 
-      // Build preview with mapped labels
       const mapped = rows.map(r => ({
         target_group: r['Target Group'],
         funnel_label: lookupMap[r['Target Group']?.trim()] || null,
@@ -164,49 +140,52 @@ export default function FunnelUpload({ onClose, onSuccess }) {
 
   const fmtN = v => v ? Number(v).toLocaleString('tr-TR') : '0'
 
+  if (result) return (
+    <div className="modal-overlay">
+      <div className="modal" style={{ maxWidth: '440px', textAlign: 'center' }}>
+        <div style={{ padding: '40px 32px' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.2rem', marginBottom: '10px' }}>Import Successful!</div>
+          <div style={{ fontSize: '0.9rem', color: 'var(--text2)', marginBottom: '6px' }}>
+            <strong style={{ color: 'var(--success)', fontSize: '1.1rem' }}>{result.imported}</strong> funnel records imported for <strong>{date}</strong>
+          </div>
+          {result.skipped > 0 && <div style={{ fontSize: '0.8rem', color: 'var(--warning)', marginBottom: '8px' }}>{result.skipped} skipped (unmatched)</div>}
+          <div style={{ fontSize: '0.78rem', color: 'var(--text3)', marginBottom: '24px' }}>Close this window to continue.</div>
+          <button className="btn-primary" style={{ padding: '12px 32px' }} onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal modal-lg" style={{ maxWidth: '760px' }}>
+      <div className="modal modal-lg">
         <div className="modal-header">
           <div>
             <h2>📡 Upload Optimove Funnel CSV</h2>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text2)', marginTop: '2px' }}>
-              Daily campaign performance data — matched against funnel mapping
-            </p>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text2)', marginTop: '2px' }}>Reads: Target Group, Targeted Customers, Control Customers, Targeted Responders, Control Responders</p>
           </div>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
 
-          {/* Date selector */}
           <div className="section-heading">Data Date</div>
           <div className="form-group" style={{ maxWidth: '240px' }}>
             <label>Date this file relates to</label>
             <input type="date" value={date} onChange={e => setDate(e.target.value)} />
           </div>
           <p style={{ fontSize: '0.78rem', color: 'var(--text2)', marginBottom: '16px' }}>
-            If uploading on a Monday for Friday's data, change the date above before importing.
+            If uploading Monday for Friday's data, change the date above before importing.
           </p>
 
-          {/* File drop zone */}
           <div className="section-heading">CSV File</div>
           <div
-            style={{
-              border: `2px dashed ${file ? 'var(--accent)' : 'var(--border)'}`,
-              borderRadius: 'var(--radius-lg)',
-              padding: '28px',
-              textAlign: 'center',
-              cursor: 'pointer',
-              background: file ? 'rgba(26,110,245,0.03)' : 'var(--bg3)',
-              transition: 'all 0.15s',
-              marginBottom: '16px',
-            }}
+            style={{ border: `2px dashed ${file ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-lg)', padding: '28px', textAlign: 'center', cursor: 'pointer', background: file ? 'rgba(26,110,245,0.03)' : 'var(--bg3)', transition: 'all 0.15s', marginBottom: '16px' }}
             onClick={() => fileRef.current?.click()}
             onDragOver={e => e.preventDefault()}
             onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
           >
-            <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }}
-              onChange={e => e.target.files[0] && handleFile(e.target.files[0])} />
+            <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => e.target.files[0] && handleFile(e.target.files[0])} />
             {file ? (
               <div>
                 <div style={{ fontSize: '1.2rem', marginBottom: '6px' }}>📄</div>
@@ -217,7 +196,7 @@ export default function FunnelUpload({ onClose, onSuccess }) {
               <div>
                 <div style={{ fontSize: '1.4rem', marginBottom: '8px', opacity: 0.4 }}>📂</div>
                 <div style={{ fontSize: '0.88rem', color: 'var(--text2)' }}>Drop your Optimove CSV here or click to browse</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text3)', marginTop: '6px' }}>Required columns: {REQUIRED_COLS.join(', ')}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text3)', marginTop: '6px' }}>Auto-detects semicolon or comma separator</div>
               </div>
             )}
           </div>
@@ -234,12 +213,9 @@ export default function FunnelUpload({ onClose, onSuccess }) {
             </div>
           )}
 
-          {/* Preview */}
-          {preview && !result && (
+          {preview && mapping && (
             <>
               <div className="section-heading">Preview</div>
-
-              {/* Match summary */}
               <div style={{ display: 'flex', gap: '10px', marginBottom: '14px' }}>
                 <div style={{ background: 'rgba(22,163,74,0.07)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: 'var(--radius)', padding: '10px 14px', flex: 1 }}>
                   <div style={{ fontSize: '0.68rem', color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>✅ Matched</div>
@@ -256,21 +232,16 @@ export default function FunnelUpload({ onClose, onSuccess }) {
                 <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '10px 14px', flex: 1 }}>
                   <div style={{ fontSize: '0.68rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>📅 Data Date</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem' }}>{date}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text2)' }}>will overwrite if reimported</div>
                 </div>
               </div>
 
-              {/* Unmatched warning */}
               {mapping.unmatchedList.length > 0 && (
                 <div style={{ background: 'rgba(220,38,38,0.04)', border: '1px solid rgba(220,38,38,0.15)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: '14px', fontSize: '0.78rem' }}>
-                  <strong style={{ color: 'var(--danger)' }}>Unmatched target groups (will be skipped):</strong>
-                  <div style={{ color: 'var(--text2)', marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>
-                    {mapping.unmatchedList.join(' · ')}
-                  </div>
+                  <strong style={{ color: 'var(--danger)' }}>Unmatched (skipped):</strong>
+                  <div style={{ color: 'var(--text2)', marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>{mapping.unmatchedList.join(' · ')}</div>
                 </div>
               )}
 
-              {/* Preview table */}
               <div style={{ overflowX: 'auto', maxHeight: '280px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem' }}>
                   <thead style={{ position: 'sticky', top: 0, background: 'var(--bg3)', zIndex: 1 }}>
@@ -297,37 +268,22 @@ export default function FunnelUpload({ onClose, onSuccess }) {
             </>
           )}
 
-          {/* Success */}
-          {result && (
-            <div style={{ background: 'rgba(22,163,74,0.07)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: 'var(--radius-lg)', padding: '20px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>✅</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', marginBottom: '6px' }}>Import successful</div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text2)' }}>
-                {result.imported} target groups imported for {date}
-                {result.skipped > 0 && ` · ${result.skipped} skipped (unmatched)`}
-              </div>
-            </div>
-          )}
-
         </div>
+
         {importing && (
           <div style={{ padding: '0 24px 12px' }}>
             <div style={{ height: '4px', background: 'var(--bg3)', borderRadius: '2px', overflow: 'hidden', marginBottom: '8px' }}>
               <div style={{ height: '100%', background: 'var(--accent)', borderRadius: '2px', animation: 'progressPulse 1.2s ease-in-out infinite' }} />
             </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--accent)', fontFamily: 'var(--font-mono)', textAlign: 'center' }}>
-              {importProgress}
-            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--accent)', fontFamily: 'var(--font-mono)', textAlign: 'center' }}>{importProgress}</div>
           </div>
         )}
 
         <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose} disabled={importing}>{result ? 'Close' : 'Cancel'}</button>
-          {preview && !result && (
+          <button className="btn-ghost" onClick={onClose} disabled={importing}>Cancel</button>
+          {preview && mapping && (
             <button className="btn-primary" onClick={handleImport} disabled={importing || mapping.matched === 0}>
-              {importing
-                ? <><span className="spinner" style={{ marginRight: '8px' }} />{importProgress || 'Importing…'}</>
-                : `Import ${mapping.matched} Records`}
+              {importing ? <><span className="spinner" style={{ marginRight: '8px' }} />{importProgress || 'Importing…'}</> : `Import ${mapping.matched} Records`}
             </button>
           )}
         </div>
