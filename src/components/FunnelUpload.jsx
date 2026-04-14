@@ -120,13 +120,11 @@ export default function FunnelUpload({ onClose, onSuccess }) {
         control_responders: r.control_responders,
       }))
 
-      setImportProgress(`Clearing existing data for ${date}…`)
-      const { error: delErr } = await supabase.from('funnel_daily').delete().eq('data_date', date)
-      if (delErr) throw new Error('Delete failed: ' + delErr.message)
-
-      setImportProgress(`Inserting ${toInsert.length} records into database…`)
-      const { error: insertErr } = await supabase.from('funnel_daily').insert(toInsert)
-      if (insertErr) throw new Error('Insert failed: ' + insertErr.message)
+      setImportProgress(`Importing ${toInsert.length} records for ${date}…`)
+      const { error: upsertErr } = await supabase
+        .from('funnel_daily')
+        .upsert(toInsert, { onConflict: 'data_date,target_group' })
+      if (upsertErr) throw new Error('Upsert failed: ' + upsertErr.message)
 
       setImportProgress('Done!')
       setResult({ imported: toInsert.length, skipped: preview.filter(r => !r.funnel_label).length })

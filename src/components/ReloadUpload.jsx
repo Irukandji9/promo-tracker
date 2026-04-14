@@ -159,13 +159,11 @@ export default function ReloadUpload({ onClose, onSuccess }) {
         control_responders: r.control_responders,
       }))
 
-      setImportProgress(`Clearing existing data for ${rangeStart} → ${rangeEnd}…`)
-      const { error: delErr } = await supabase.from('reload_daily').delete().eq('range_start', rangeStart).eq('range_end', rangeEnd)
-      if (delErr) throw new Error('Delete failed: ' + delErr.message)
-
-      setImportProgress(`Inserting ${toInsert.length} records into database…`)
-      const { error: insertErr } = await supabase.from('reload_daily').insert(toInsert)
-      if (insertErr) throw new Error('Insert failed: ' + insertErr.message)
+      setImportProgress(`Importing ${toInsert.length} records for ${rangeStart} → ${rangeEnd}…`)
+      const { error: upsertErr } = await supabase
+        .from('reload_daily')
+        .upsert(toInsert, { onConflict: 'range_start,range_end,target_group' })
+      if (upsertErr) throw new Error('Upsert failed: ' + upsertErr.message)
 
       setImportProgress('Done!')
       setResult({ imported: toInsert.length, skipped: preview.filter(r => !r.decoded_label).length, rangeStart, rangeEnd })
