@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react'
 import { supabase } from '../supabase'
 
-const REQUIRED_COLS = ['Target Group', 'Targeted Customers', 'Control Customers', 'Targeted Responders', 'Control Responders']
+const REQUIRED_COLS = ['Target Group', 'Communication type', 'Targeted Customers', 'Control Customers', 'Targeted Responders', 'Control Responders']
 
 function parseCSVLine(line, sep) {
   const result = []
@@ -47,7 +47,7 @@ function parseCSV(text) {
         row[col] = colIdx[col] !== undefined ? (vals[colIdx[col]] || '') : ''
       })
       return row
-    }).filter(r => r['Target Group']?.trim())
+    }).filter(r => r['Target Group']?.trim() && r['Communication type']?.trim() === 'Scheduled')
   }
 }
 
@@ -159,10 +159,15 @@ export default function ReloadUpload({ onClose, onSuccess }) {
         control_responders: r.control_responders,
       }))
 
-      setImportProgress(`Importing ${toInsert.length} records for ${rangeStart} → ${rangeEnd}…`)
+      // Deduplicate by target_group — keep last occurrence
+      const dedupedMap = {}
+      toInsert.forEach(r => { dedupedMap[r.target_group] = r })
+      const deduped = Object.values(dedupedMap)
+
+      setImportProgress(`Importing ${deduped.length} records for ${rangeStart} → ${rangeEnd}…`)
       const { error: upsertErr } = await supabase
         .from('reload_daily')
-        .upsert(toInsert, { onConflict: 'range_start,range_end,target_group' })
+        .upsert(deduped, { onConflict: 'range_start,range_end,target_group' })
       if (upsertErr) throw new Error('Upsert failed: ' + upsertErr.message)
 
       setImportProgress('Done!')
