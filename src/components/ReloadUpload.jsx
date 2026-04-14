@@ -18,8 +18,7 @@ function parseCSVLine(line, sep) {
 
 function detectSeparator(text) {
   const firstLine = text.split('\n')[0]
-  const sc = (firstLine.match(/;/g) || []).length
-  return sc > 0 ? ';' : ','
+  return (firstLine.match(/;/g) || []).length > 0 ? ';' : ','
 }
 
 function parseNum(val) {
@@ -32,10 +31,9 @@ function parseCSV(text) {
   const lines = text.trim().split('\n').filter(l => l.trim())
   const headers = parseCSVLine(lines[0], sep)
 
-  // Only extract the 5 columns we need — ignore Action and all other columns
-  const TARGET_COLS = ['Target Group', 'Targeted Customers', 'Control Customers', 'Targeted Responders', 'Control Responders']
+  // Find column indices for only the 5 columns we need
   const colIdx = {}
-  TARGET_COLS.forEach(col => {
+  REQUIRED_COLS.forEach(col => {
     const idx = headers.findIndex(h => h === col)
     if (idx !== -1) colIdx[col] = idx
   })
@@ -45,35 +43,9 @@ function parseCSV(text) {
     rows: lines.slice(1).map(line => {
       const vals = parseCSVLine(line, sep)
       const row = {}
-      TARGET_COLS.forEach(col => {
+      REQUIRED_COLS.forEach(col => {
         row[col] = colIdx[col] !== undefined ? (vals[colIdx[col]] || '') : ''
       })
-      return row
-    }).filter(r => r['Target Group']?.trim())
-  }
-}
-
-function detectSeparator(text) {
-  const firstLine = text.split('\n')[0]
-  const sc = (firstLine.match(/;/g) || []).length
-  return sc > 0 ? ';' : ','
-}
-
-function parseNum(val) {
-  if (!val) return 0
-  return parseInt(String(val).replace(/,/g, '').trim()) || 0
-}
-
-function parseCSV(text) {
-  const sep = detectSeparator(text)
-  const lines = text.trim().split('\n').filter(l => l.trim())
-  const headers = parseCSVLine(lines[0], sep)
-  return {
-    sep,
-    rows: lines.slice(1).map(line => {
-      const vals = parseCSVLine(line, sep)
-      const row = {}
-      headers.forEach((h, i) => { row[h] = vals[i] || '' })
       return row
     }).filter(r => r['Target Group']?.trim())
   }
@@ -89,9 +61,17 @@ export default function ReloadUpload({ onClose, onSuccess }) {
   const [matchSummary, setMatchSummary] = useState(null)
   const [loading, setLoading] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState('')
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
   const fileRef = useRef()
+
+  function parseDate(val) {
+    if (!val) return null
+    const parts = String(val).trim().split('/')
+    if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`
+    return val
+  }
 
   const handleFile = async (f) => {
     setFile(f)
@@ -107,14 +87,15 @@ export default function ReloadUpload({ onClose, onSuccess }) {
 
       if (!rows.length) throw new Error('No data rows found in file')
 
-      const missing = REQUIRED_COLS.filter(c => !Object.keys(rows[0]).includes(c))
+      const missing = REQUIRED_COLS.filter(c => !Object.keys(rows[0]).includes(c) || rows[0][c] === undefined)
       if (missing.length > 0) throw new Error(`Missing columns: ${missing.join(', ')}`)
 
-      // Auto-read dates from file
-      const fileStart = parseDate(rows[0]['Range Start Date'])
-      const fileEnd = parseDate(rows[0]['Range End Date'])
-      if (fileStart) setRangeStart(fileStart)
-      if (fileEnd) setRangeEnd(fileEnd)
+      // Auto-read dates from filename (YYYY-MM-DD_YYYY-MM-DD pattern)
+      const dateMatch = f.name.match(/(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})/)
+      if (dateMatch) {
+        setRangeStart(dateMatch[1])
+        setRangeEnd(dateMatch[2])
+      }
 
       // Fetch reload mapping
       const { data: reloadMap, error: mapErr } = await supabase
@@ -152,8 +133,6 @@ export default function ReloadUpload({ onClose, onSuccess }) {
     }
     setLoading(false)
   }
-
-  const [importProgress, setImportProgress] = useState('')
 
   const handleImport = async () => {
     if (!preview || !rangeStart || !rangeEnd) {
@@ -200,12 +179,11 @@ export default function ReloadUpload({ onClose, onSuccess }) {
 
   const fmtN = v => v ? Number(v).toLocaleString('tr-TR') : '0'
   const convRate = (resp, targ) => targ > 0 ? ((resp / targ) * 100).toFixed(1) + '%' : '—'
-  const lift = (tResp, tTarg, cResp, cTarg) => {
-    if (!tTarg || !cTarg) return null
-    return ((tResp / tTarg) - (cResp / cTarg)) * 100
+  const liftPP = (tR, tT, cR, cT) => {
+    if (!tT || !cT) return null
+    return ((tR / tT) - (cR / cT)) * 100
   }
 
-  // Group preview by lifecycle for display
   const grouped = preview ? preview.reduce((acc, r) => {
     const key = r.lifecycle || 'Unknown'
     if (!acc[key]) acc[key] = []
@@ -215,7 +193,6 @@ export default function ReloadUpload({ onClose, onSuccess }) {
 
   const lifecycleOrder = ['Active', 'Churned Short Lapse', 'Churned Long Lapse', 'OTD', 'Dormant', 'Unknown']
 
-  // Show full-screen success state instead of modal
   if (result) return (
     <div className="modal-overlay">
       <div className="modal" style={{ maxWidth: '460px', textAlign: 'center', padding: '0' }}>
@@ -230,7 +207,7 @@ export default function ReloadUpload({ onClose, onSuccess }) {
           </div>
           {result.skipped > 0 && (
             <div style={{ fontSize: '0.8rem', color: 'var(--warning)', marginBottom: '8px' }}>
-              {result.skipped} segments skipped (unmatched target groups)
+              {result.skipped} segments skipped (unmatched)
             </div>
           )}
           <div style={{ fontSize: '0.78rem', color: 'var(--text3)', marginBottom: '24px' }}>
@@ -251,37 +228,26 @@ export default function ReloadUpload({ onClose, onSuccess }) {
           <div>
             <h2>🔄 Upload Reload Campaign CSV</h2>
             <p style={{ fontSize: '0.78rem', color: 'var(--text2)', marginTop: '2px' }}>
-              Optimove reload campaign data — matched against all 43 reload target groups
+              Reads: Target Group, Targeted Customers, Control Customers, Targeted Responders, Control Responders
             </p>
           </div>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
 
-          {/* File drop zone */}
           <div className="section-heading">CSV File</div>
           <div
-            style={{
-              border: `2px dashed ${file ? 'var(--accent)' : 'var(--border)'}`,
-              borderRadius: 'var(--radius-lg)',
-              padding: '24px',
-              textAlign: 'center',
-              cursor: 'pointer',
-              background: file ? 'rgba(26,110,245,0.03)' : 'var(--bg3)',
-              transition: 'all 0.15s',
-              marginBottom: '16px',
-            }}
+            style={{ border: `2px dashed ${file ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-lg)', padding: '24px', textAlign: 'center', cursor: 'pointer', background: file ? 'rgba(26,110,245,0.03)' : 'var(--bg3)', transition: 'all 0.15s', marginBottom: '16px' }}
             onClick={() => fileRef.current?.click()}
             onDragOver={e => e.preventDefault()}
             onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
           >
-            <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }}
-              onChange={e => e.target.files[0] && handleFile(e.target.files[0])} />
+            <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => e.target.files[0] && handleFile(e.target.files[0])} />
             {file ? (
               <div>
                 <div style={{ fontSize: '1.1rem', marginBottom: '4px' }}>📄</div>
                 <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{file.name}</div>
-                {matchSummary && <div style={{ fontSize: '0.72rem', color: 'var(--text2)', marginTop: '3px' }}>Detected separator: {matchSummary.sep === ';' ? 'semicolon' : 'comma'}</div>}
+                {matchSummary && <div style={{ fontSize: '0.72rem', color: 'var(--text2)', marginTop: '3px' }}>Separator: {matchSummary.sep === ';' ? 'semicolon' : 'comma'}</div>}
                 <div style={{ fontSize: '0.75rem', color: 'var(--accent)', marginTop: '4px' }}>Click to change file</div>
               </div>
             ) : (
@@ -305,11 +271,10 @@ export default function ReloadUpload({ onClose, onSuccess }) {
             </div>
           )}
 
-          {/* Date range — shown after file parsed */}
-          {preview && !result && (
+          {preview && (
             <>
               <div className="section-heading">Date Range</div>
-              <div className="form-row" style={{ marginBottom: '16px' }}>
+              <div className="form-row" style={{ marginBottom: '8px' }}>
                 <div className="form-group">
                   <label>Range Start Date</label>
                   <input type="date" value={rangeStart} onChange={e => setRangeStart(e.target.value)} />
@@ -319,11 +284,10 @@ export default function ReloadUpload({ onClose, onSuccess }) {
                   <input type="date" value={rangeEnd} onChange={e => setRangeEnd(e.target.value)} />
                 </div>
               </div>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text2)', marginBottom: '16px', marginTop: '-8px' }}>
-                Dates auto-read from file. Adjust if needed — re-importing for the same date range will overwrite existing data.
+              <p style={{ fontSize: '0.78rem', color: 'var(--text2)', marginBottom: '16px' }}>
+                Dates auto-read from filename. Adjust if needed.
               </p>
 
-              {/* Match summary */}
               <div className="section-heading">Match Summary</div>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
                 <div style={{ background: 'rgba(22,163,74,0.07)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: 'var(--radius)', padding: '10px 14px', flex: 1 }}>
@@ -352,9 +316,8 @@ export default function ReloadUpload({ onClose, onSuccess }) {
                 </div>
               )}
 
-              {/* Preview grouped by lifecycle */}
               <div className="section-heading">Data Preview</div>
-              <div style={{ overflowX: 'auto', maxHeight: '320px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+              <div style={{ overflowX: 'auto', maxHeight: '280px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem' }}>
                   <thead style={{ position: 'sticky', top: 0, background: 'var(--bg3)', zIndex: 1 }}>
                     <tr>
@@ -371,8 +334,8 @@ export default function ReloadUpload({ onClose, onSuccess }) {
                             {lc}
                           </td>
                         </tr>
-                        {grouped[lc].sort((a, b) => VALUE_ORDER.indexOf(a.value_segment) - VALUE_ORDER.indexOf(b.value_segment)).map((r, i) => {
-                          const liftVal = lift(r.targeted_responders, r.targeted_customers, r.control_responders, r.control_customers)
+                        {[...grouped[lc]].sort((a, b) => VALUE_ORDER.indexOf(a.value_segment) - VALUE_ORDER.indexOf(b.value_segment)).map((r, i) => {
+                          const liftVal = liftPP(r.targeted_responders, r.targeted_customers, r.control_responders, r.control_customers)
                           return (
                             <tr key={i} style={{ borderBottom: '1px solid var(--border)', opacity: r.decoded_label ? 1 : 0.4 }}>
                               <td style={{ padding: '6px 10px', fontFamily: 'var(--font-mono)', fontSize: '0.68rem', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -389,7 +352,7 @@ export default function ReloadUpload({ onClose, onSuccess }) {
                               <td style={{ padding: '6px 10px', fontFamily: 'var(--font-mono)', color: 'var(--success)', fontWeight: 600 }}>{fmtN(r.targeted_responders)}</td>
                               <td style={{ padding: '6px 10px', fontFamily: 'var(--font-mono)' }}>{fmtN(r.control_responders)}</td>
                               <td style={{ padding: '6px 10px', fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{convRate(r.targeted_responders, r.targeted_customers)}</td>
-                              <td style={{ padding: '6px 10px', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: liftVal > 0 ? 'var(--success)' : liftVal < 0 ? 'var(--danger)' : 'var(--text3)' }}>
+                              <td style={{ padding: '6px 10px', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: liftVal === null ? 'var(--text3)' : liftVal > 0 ? 'var(--success)' : 'var(--danger)' }}>
                                 {liftVal !== null ? `${liftVal > 0 ? '+' : ''}${liftVal.toFixed(1)}pp` : '—'}
                               </td>
                             </tr>
@@ -403,28 +366,22 @@ export default function ReloadUpload({ onClose, onSuccess }) {
             </>
           )}
 
-          {/* Success */}
         </div>
 
-        {/* Progress bar */}
         {importing && (
           <div style={{ padding: '0 24px 12px' }}>
             <div style={{ height: '4px', background: 'var(--bg3)', borderRadius: '2px', overflow: 'hidden', marginBottom: '8px' }}>
               <div style={{ height: '100%', background: 'var(--accent)', borderRadius: '2px', animation: 'progressPulse 1.2s ease-in-out infinite' }} />
             </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--accent)', fontFamily: 'var(--font-mono)', textAlign: 'center' }}>
-              {importProgress}
-            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--accent)', fontFamily: 'var(--font-mono)', textAlign: 'center' }}>{importProgress}</div>
           </div>
         )}
 
         <div className="modal-footer">
           <button className="btn-ghost" onClick={onClose} disabled={importing}>Cancel</button>
-          {preview && !result && (
+          {preview && (
             <button className="btn-primary" onClick={handleImport} disabled={importing || matchSummary.matched === 0 || !rangeStart || !rangeEnd}>
-              {importing
-                ? <><span className="spinner" style={{ marginRight: '8px' }} />{importProgress || 'Importing…'}</>
-                : `Import ${matchSummary.matched} Records`}
+              {importing ? <><span className="spinner" style={{ marginRight: '8px' }} />{importProgress || 'Importing…'}</> : `Import ${matchSummary.matched} Records`}
             </button>
           )}
         </div>
@@ -432,9 +389,3 @@ export default function ReloadUpload({ onClose, onSuccess }) {
     </div>
   )
 }
-
-// Success overlay — shown INSTEAD of the main modal
-function SuccessScreen({ result, onClose }) {
-  return null // handled inline below
-}
-
