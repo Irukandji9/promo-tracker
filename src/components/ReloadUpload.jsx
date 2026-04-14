@@ -3,11 +3,23 @@ import { supabase } from '../supabase'
 
 const REQUIRED_COLS = ['Target Group', 'Targeted Customers', 'Control Customers', 'Targeted Responders', 'Control Responders']
 
+function parseCSVLine(line, sep) {
+  const result = []
+  let cur = '', inQuote = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') { inQuote = !inQuote }
+    else if (ch === sep && !inQuote) { result.push(cur.trim()); cur = '' }
+    else { cur += ch }
+  }
+  result.push(cur.trim())
+  return result.map(v => v.replace(/^"|"$/g, '').trim())
+}
+
 function detectSeparator(text) {
   const firstLine = text.split('\n')[0]
-  const semicolons = (firstLine.match(/;/g) || []).length
-  const commas = (firstLine.match(/,/g) || []).length
-  return semicolons > commas ? ';' : ','
+  const sc = (firstLine.match(/;/g) || []).length
+  return sc > 0 ? ';' : ','
 }
 
 function parseNum(val) {
@@ -15,22 +27,51 @@ function parseNum(val) {
   return parseInt(String(val).replace(/,/g, '').trim()) || 0
 }
 
-function parseDate(val) {
-  if (!val) return null
-  // Handle DD/MM/YYYY format
-  const parts = String(val).trim().split('/')
-  if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`
-  return val
+function parseCSV(text) {
+  const sep = detectSeparator(text)
+  const lines = text.trim().split('\n').filter(l => l.trim())
+  const headers = parseCSVLine(lines[0], sep)
+
+  // Only extract the 5 columns we need — ignore Action and all other columns
+  const TARGET_COLS = ['Target Group', 'Targeted Customers', 'Control Customers', 'Targeted Responders', 'Control Responders']
+  const colIdx = {}
+  TARGET_COLS.forEach(col => {
+    const idx = headers.findIndex(h => h === col)
+    if (idx !== -1) colIdx[col] = idx
+  })
+
+  return {
+    sep,
+    rows: lines.slice(1).map(line => {
+      const vals = parseCSVLine(line, sep)
+      const row = {}
+      TARGET_COLS.forEach(col => {
+        row[col] = colIdx[col] !== undefined ? (vals[colIdx[col]] || '') : ''
+      })
+      return row
+    }).filter(r => r['Target Group']?.trim())
+  }
+}
+
+function detectSeparator(text) {
+  const firstLine = text.split('\n')[0]
+  const sc = (firstLine.match(/;/g) || []).length
+  return sc > 0 ? ';' : ','
+}
+
+function parseNum(val) {
+  if (!val) return 0
+  return parseInt(String(val).replace(/,/g, '').trim()) || 0
 }
 
 function parseCSV(text) {
   const sep = detectSeparator(text)
   const lines = text.trim().split('\n').filter(l => l.trim())
-  const headers = lines[0].split(sep).map(h => h.trim().replace(/^"|"$/g, ''))
+  const headers = parseCSVLine(lines[0], sep)
   return {
     sep,
     rows: lines.slice(1).map(line => {
-      const vals = line.split(sep).map(v => v.trim().replace(/^"|"$/g, ''))
+      const vals = parseCSVLine(line, sep)
       const row = {}
       headers.forEach((h, i) => { row[h] = vals[i] || '' })
       return row

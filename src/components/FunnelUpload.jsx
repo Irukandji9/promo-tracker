@@ -3,11 +3,58 @@ import { supabase } from '../supabase'
 
 const REQUIRED_COLS = ['Target Group', 'Targeted Customers', 'Control Customers', 'Targeted Responders', 'Control Responders']
 
+function parseCSVLine(line, sep) {
+  const result = []
+  let cur = '', inQuote = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') { inQuote = !inQuote }
+    else if (ch === sep && !inQuote) { result.push(cur.trim()); cur = '' }
+    else { cur += ch }
+  }
+  result.push(cur.trim())
+  return result.map(v => v.replace(/^"|"$/g, '').trim())
+}
+
+function detectSep(line) {
+  const sc = (line.match(/;/g) || []).length
+  return sc > 0 ? ';' : ','
+}
+
 function parseCSV(text) {
-  const lines = text.trim().split('\n')
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
+  const lines = text.trim().split('\n').filter(l => l.trim())
+  const sep = detectSep(lines[0])
+  const headers = parseCSVLine(lines[0], sep)
+
+  // Only extract the columns we care about — ignore everything else
+  const TARGET_COLS = ['Target Group', 'Targeted Customers', 'Control Customers', 'Targeted Responders', 'Control Responders']
+  const colIdx = {}
+  TARGET_COLS.forEach(col => {
+    const idx = headers.findIndex(h => h === col)
+    if (idx !== -1) colIdx[col] = idx
+  })
+
   return lines.slice(1).map(line => {
-    const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''))
+    const vals = parseCSVLine(line, sep)
+    const row = {}
+    TARGET_COLS.forEach(col => {
+      row[col] = colIdx[col] !== undefined ? (vals[colIdx[col]] || '') : ''
+    })
+    return row
+  }).filter(r => r['Target Group']?.trim())
+}
+
+function detectSep(line) {
+  const sc = (line.match(/;/g) || []).length
+  return sc > 0 ? ';' : ','
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n').filter(l => l.trim())
+  const sep = detectSep(lines[0])
+  const headers = parseCSVLine(lines[0], sep)
+  return lines.slice(1).map(line => {
+    const vals = parseCSVLine(line, sep)
     const row = {}
     headers.forEach((h, i) => { row[h] = vals[i] || '' })
     return row
