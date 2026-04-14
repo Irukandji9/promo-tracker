@@ -402,7 +402,7 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                 <thead>
                   <tr style={{ background: 'var(--bg3)' }}>
-                    {['Date','Promotion','Domain','Type','Lifecycle','Value','Targeted','Depositors','Bonus Cost','GGR','B/GGR','NGR','Status',''].map(h => (
+                    {['Date','Promotion','Domain','Type','Targeted','Depositors','Bonus Cost','GGR','B/GGR','NGR','Status',''].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '9px 12px', color: 'var(--text2)', fontWeight: 500, fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -420,17 +420,14 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
                           onClick={() => setExpandedRow(isExpanded ? null : p.id)}
                         >
                           <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text2)', whiteSpace: 'nowrap' }}>
-                            {p.start_date || '—'}{p.ongoing ? ' →∞' : p.end_date ? `\n→ ${p.end_date}` : ''}
-                            {days && <span style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text3)' }}>{days}d</span>}
+                            {p.start_date ? p.start_date.slice(0, 10) : '—'}
+                            {p.ongoing && <span style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text3)' }}>Ongoing</span>}
                           </td>
-                          <td style={{ padding: '10px 12px', fontWeight: 600, maxWidth: '180px' }}>
+                          <td style={{ padding: '10px 12px', fontWeight: 600, maxWidth: '200px' }}>
                             <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                            {p.reporting_tag && <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--accent)', marginTop: '2px' }}>{p.reporting_tag}</div>}
                           </td>
                           <td style={{ padding: '10px 12px', fontSize: '0.75rem', color: 'var(--text2)' }}>{p.domain || '—'}</td>
                           <td style={{ padding: '10px 12px' }}><TypeTag type={p.type} /></td>
-                          <td style={{ padding: '10px 12px', fontSize: '0.75rem', color: 'var(--text2)' }}>{p.lifecycle_stage || '—'}</td>
-                          <td style={{ padding: '10px 12px', fontSize: '0.75rem', color: 'var(--text2)' }}>{p.value_segment || '—'}</td>
                           <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>{fmtN(p.targeted_count)}</td>
                           <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>{fmtN(p.depositors)}</td>
                           <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--danger)' }}>{fmt(p.bonus_cost)}</td>
@@ -444,7 +441,7 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
                         </tr>
                         {isExpanded && (
                           <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td colSpan={14} style={{ padding: '12px 16px', background: 'rgba(26,110,245,0.02)' }}>
+                            <td colSpan={12} style={{ padding: '12px 16px', background: 'rgba(26,110,245,0.02)' }}>
                               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
                                 {p.offer_description && (
                                   <div style={{ flex: 2, minWidth: '200px', fontSize: '0.8rem', color: 'var(--text2)', borderLeft: '2px solid var(--border)', paddingLeft: '10px' }}>
@@ -627,7 +624,7 @@ function ReloadOverviewSection({ reloadData }) {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
           <thead>
             <tr style={{ background: 'var(--bg3)' }}>
-              {['Group', 'Value Seg.', 'Product', 'Targeted', 'Responders', 'Conv %', 'Ctrl Conv %', 'Lift'].map(h => (
+              {['Segment', 'Value', 'Product', 'Targeted', 'Responders', 'Conv %', 'Ctrl Conv %', 'Lift'].map(h => (
                 <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text2)', fontWeight: 500, fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
@@ -642,8 +639,8 @@ function ReloadOverviewSection({ reloadData }) {
                   <tr key={`${g.lifecycle}${g.product}${i}`} style={{ borderBottom: '1px solid var(--border)' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <td style={{ padding: '8px 12px', fontWeight: i === 0 ? 600 : 400, color: i === 0 ? 'var(--text)' : 'var(--text3)', fontSize: '0.75rem' }}>
-                      {i === 0 ? `${g.lifecycle} ${g.product}` : ''}
+                    <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                      {`${g.lifecycle} ${g.product}`}
                     </td>
                     <td style={{ padding: '8px 12px' }}>
                       {r.value_segment ? <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'var(--bg3)', border: '1px solid var(--border)', fontWeight: 700 }}>{r.value_segment}</span> : '—'}
