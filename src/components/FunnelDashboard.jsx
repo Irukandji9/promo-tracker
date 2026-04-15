@@ -118,10 +118,22 @@ export default function FunnelDashboard({ onUpload }) {
   const fetchAll = async () => {
     setLoading(true)
     setFetchError(null)
-    const { data, error } = await supabase.from('funnel_daily').select('*').order('data_date', { ascending: true }).limit(50000)
-    if (error) { setFetchError(error.message); setLoading(false); return }
-    console.log('Funnel data loaded:', (data || []).length, 'rows, dates:', [...new Set((data || []).map(r => r.data_date))].sort())
-    setAllData(data || [])
+    let allRows = []
+    let from = 0
+    const PAGE = 1000
+    while (true) {
+      const { data, error } = await supabase
+        .from('funnel_daily')
+        .select('*')
+        .order('data_date', { ascending: true })
+        .range(from, from + PAGE - 1)
+      if (error) { setFetchError(error.message); setLoading(false); return }
+      if (!data || data.length === 0) break
+      allRows = allRows.concat(data)
+      if (data.length < PAGE) break
+      from += PAGE
+    }
+    setAllData(allRows)
     setLoading(false)
   }
 
