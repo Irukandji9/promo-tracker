@@ -144,7 +144,7 @@ export default function ReloadDashboard({ onUpload }) {
     setLoading(true)
     setFetchError(null)
     const [{ data: rd, error: rdErr }, { data: td, error: tdErr }] = await Promise.all([
-      supabase.from('reload_daily').select('*').order('range_start', { ascending: true }),
+      supabase.from('reload_daily').select('*').order('range_start', { ascending: true }).limit(10000),
       supabase.from('reload_reporting_tags').select('*'),
     ])
     if (rdErr) { setFetchError('reload_daily error: ' + rdErr.message); setLoading(false); return }

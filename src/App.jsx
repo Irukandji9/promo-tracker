@@ -89,7 +89,7 @@ export default function App({ session }) {
   useEffect(() => { fetchPromos() }, [fetchPromos])
 
   const fetchReloadData = useCallback(async () => {
-    const { data } = await supabase.from('reload_daily').select('*').order('range_start', { ascending: false })
+    const { data } = await supabase.from('reload_daily').select('*').order('range_start', { ascending: false }).limit(10000)
     if (data) setReloadData(data)
   }, [])
 
@@ -480,8 +480,9 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
               </table>
             </div>
 
-            {/* RELOAD DATA SUMMARY IN OVERVIEW */}
+            {/* RELOAD & FUNNEL SUMMARY IN OVERVIEW */}
             <ReloadOverviewSection reloadData={reloadData} />
+            <FunnelOverviewSection funnelData={funnelData} />
           </>
         ) : (
           /* TYPE TAB — card grid */
@@ -656,6 +657,84 @@ function ReloadOverviewSection({ reloadData }) {
                     <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent)' }}>{pct(r.targeted_responders, r.targeted_customers)}</td>
                     <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', color: 'var(--text2)' }}>{ctrlConv}</td>
                     <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 700, color: liftVal === null ? 'var(--text3)' : liftVal > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                      {liftVal !== null ? `${liftVal > 0 ? '+' : ''}${liftVal.toFixed(1)}pp` : '—'}
+                    </td>
+                  </tr>
+                )
+              })
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// Funnel summary for Overview tab — one row per funnel label per date
+function FunnelOverviewSection({ funnelData }) {
+  if (!funnelData || funnelData.length === 0) return null
+
+  const fmtN = v => v ? Number(v).toLocaleString('tr-TR') : '0'
+  const pct = (a, b) => (a > 0 && b > 0) ? ((a / b) * 100).toFixed(1) + '%' : '—'
+  const lift = (tR, tT, cR, cT) => {
+    if (!tT || !cT) return null
+    return ((tR / tT) - (cR / cT)) * 100
+  }
+
+  // Group by date then funnel_label
+  const dates = [...new Set(funnelData.map(r => r.data_date))].sort().reverse()
+
+  // For overview show last 3 dates to keep it scannable
+  const recentDates = dates.slice(0, 3)
+
+  // Unique funnel labels that have data
+  const labels = [...new Set(funnelData.map(r => r.funnel_label))].sort()
+
+  const agg = (rows) => rows.reduce((acc, r) => ({
+    targeted: acc.targeted + (r.targeted_customers || 0),
+    control: acc.control + (r.control_customers || 0),
+    responders: acc.responders + (r.targeted_responders || 0),
+    ctrl_resp: acc.ctrl_resp + (r.control_responders || 0),
+  }), { targeted: 0, control: 0, responders: 0, ctrl_resp: 0 })
+
+  return (
+    <div style={{ marginTop: '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+        <div className="section-heading" style={{ margin: 0 }}>📡 Funnel Data — Recent {recentDates.length} Days</div>
+        <span style={{ fontSize: '0.72rem', color: 'var(--text3)' }}>{dates.length} total upload{dates.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+          <thead>
+            <tr style={{ background: 'var(--bg3)' }}>
+              {['Date', 'Funnel', 'Targeted', 'Control', 'Responders', 'Conv %', 'Ctrl Conv %', 'Lift'].map(h => (
+                <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text2)', fontWeight: 500, fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {recentDates.map(date => {
+              const dateRows = funnelData.filter(r => r.data_date === date)
+              const dateLabels = [...new Set(dateRows.map(r => r.funnel_label))].sort()
+              return dateLabels.map((label, i) => {
+                const rows = dateRows.filter(r => r.funnel_label === label)
+                const tot = agg(rows)
+                const liftVal = lift(tot.responders, tot.targeted, tot.ctrl_resp, tot.control)
+                const ctrlConv = pct(tot.ctrl_resp, tot.control)
+                return (
+                  <tr key={`${date}-${label}`} style={{ borderBottom: '1px solid var(--border)' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: 'var(--text2)', fontWeight: i === 0 ? 600 : 400 }}>
+                      {i === 0 ? date : ''}
+                    </td>
+                    <td style={{ padding: '7px 12px', fontWeight: 500, fontSize: '0.75rem' }}>{label}</td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)' }}>{fmtN(tot.targeted)}</td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)', color: 'var(--text2)' }}>{fmtN(tot.control)}</td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--success)' }}>{fmtN(tot.responders)}</td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent)' }}>{pct(tot.responders, tot.targeted)}</td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)', color: 'var(--text2)' }}>{ctrlConv}</td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 700, color: liftVal === null ? 'var(--text3)' : liftVal > 0 ? 'var(--success)' : 'var(--danger)' }}>
                       {liftVal !== null ? `${liftVal > 0 ? '+' : ''}${liftVal.toFixed(1)}pp` : '—'}
                     </td>
                   </tr>
