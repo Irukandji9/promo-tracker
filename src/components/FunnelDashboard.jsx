@@ -111,6 +111,7 @@ export default function FunnelDashboard({ onUpload }) {
   const [fetchError, setFetchError] = useState(null)
   const [expandedGroup, setExpandedGroup] = useState(null)
   const [expandedDays, setExpandedDays] = useState({})
+  const [dateFilter, setDateFilter] = useState('all')
 
   useEffect(() => { fetchAll() }, [])
 
@@ -167,8 +168,8 @@ export default function FunnelDashboard({ onUpload }) {
   return (
     <div>
       {/* Top bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
           {expandedGroup && (
             <button className="btn-ghost" style={{ fontSize: '0.78rem', padding: '5px 12px' }}
               onClick={() => { setExpandedGroup(null); setExpandedDays({}) }}>← Back</button>
@@ -176,6 +177,16 @@ export default function FunnelDashboard({ onUpload }) {
         </div>
         <button className="btn-analysis" style={{ fontSize: '0.78rem', padding: '5px 12px' }} onClick={onUpload}>📡 Upload CSV</button>
       </div>
+      {/* Date filter — shown when drilling into a group */}
+      {expandedGroup && dates.length > 0 && (
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '14px' }}>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Filter</span>
+          <button onClick={() => setDateFilter('all')} style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '0.74rem', fontWeight: 500, border: '1px solid', cursor: 'pointer', background: dateFilter === 'all' ? 'var(--accent)' : 'transparent', borderColor: dateFilter === 'all' ? 'var(--accent)' : 'var(--border)', color: dateFilter === 'all' ? '#fff' : 'var(--text2)' }}>All dates</button>
+          {dates.map(d => (
+            <button key={d} onClick={() => setDateFilter(d)} style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '0.74rem', fontWeight: 500, border: '1px solid', cursor: 'pointer', background: dateFilter === d ? 'var(--accent)' : 'transparent', borderColor: dateFilter === d ? 'var(--accent)' : 'var(--border)', color: dateFilter === d ? '#fff' : 'var(--text2)' }}>{d.slice(5)}</button>
+          ))}
+        </div>
+      )}
 
       {/* Chart — always visible */}
       <LineChart seriesData={seriesData.filter(s => s.hasData)} dates={dates} />
@@ -245,7 +256,7 @@ export default function FunnelDashboard({ onUpload }) {
                   ))}
                 </div>
 
-                {dates.map(date => {
+                {(dateFilter === 'all' ? dates : dates.filter(d => d === dateFilter)).map(date => {
                   const dayRows = groupRows.filter(r => r.data_date === date)
                   if (!dayRows.length) return null
                   const tot = agg(dayRows)
