@@ -227,8 +227,7 @@ export default function ReloadDashboard({ onUpload }) {
         </div>
       )}
 
-      {/* Chart */}
-      <LineChart seriesData={seriesData.filter(s => s.hasData)} dates={dates} />
+      {/* Chart — only shown in drill-down */}
 
       {!expandedGroup ? (
         <>
@@ -282,6 +281,7 @@ export default function ReloadDashboard({ onUpload }) {
                 </div>
               </div>
 
+              <LineChart seriesData={[{ ...g, points: dates.map(d => { const rows = groupRows(g, allData.filter(r => r.data_date === d)); const t = agg(rows); return { conv: t.targeted > 0 ? (t.responders / t.targeted) * 100 : 0 } }), hasData: true }]} dates={dates} />
               <div className="section-heading">Daily breakdown — click + to see value segments</div>
               <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '28px 120px 1fr 100px 100px 100px 90px 100px 90px', background: 'var(--bg3)', borderBottom: '1px solid var(--border)', padding: '8px 14px', gap: '8px' }}>

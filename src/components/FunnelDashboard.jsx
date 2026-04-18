@@ -200,8 +200,7 @@ export default function FunnelDashboard({ onUpload }) {
         </div>
       )}
 
-      {/* Chart — always visible */}
-      <LineChart seriesData={seriesData.filter(s => s.hasData)} dates={dates} />
+      {/* Chart — only shown in drill-down */}
 
       {!expandedGroup ? (
         /* FUNNEL GROUP TILES */
@@ -258,6 +257,7 @@ export default function FunnelDashboard({ onUpload }) {
                 </div>
               </div>
 
+              <LineChart seriesData={[{ ...g, points: dates.map(d => { const rows = allData.filter(r => r.data_date === d && r.funnel_label === g.key); const t = agg(rows); return { conv: t.targeted > 0 ? (t.responders / t.targeted) * 100 : 0 } }), hasData: true }]} dates={dates} />
               <div className="section-heading">Daily breakdown — click + to see target groups for that day</div>
 
               <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
