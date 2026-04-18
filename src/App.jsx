@@ -238,36 +238,66 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
   }
 
   // CSV EXPORT — previous month
-  const handleExportCSV = () => {
-    const prevMonthIdx = MONTHS.indexOf(selectedMonth.split(' ')[0]) - 1
-    const exportMonth = prevMonthIdx >= 0 ? `${MONTHS[prevMonthIdx]} ${currentYear}` : `${MONTHS[11]} ${currentYear - 1}`
+  const handleExportCSV = (type) => {
+    const dl = (csv, name) => {
+      const blob = new Blob([csv], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }
+
+    const pct = (a, b) => (a > 0 && b > 0) ? ((a / b) * 100).toFixed(1) + '%' : ''
+    const liftPP = (tR, tT, cR, cT) => (!tT || !cT) ? '' : (((tR/tT) - (cR/cT)) * 100).toFixed(1) + 'pp'
+
+    if (type === 'reload') {
+      const headers = ['Date', 'Segment', 'Value', 'Targeted', 'Responders', 'Conv %', 'Ctrl Conv %', 'Conv vs Control']
+      const rows = reloadData.filter(r => !r.is_reminder).map(r => [
+        `${r.range_start} to ${r.range_end}`,
+        `${r.lifecycle} ${r.product}`,
+        r.value_segment || '',
+        r.targeted_customers || 0,
+        r.targeted_responders || 0,
+        pct(r.targeted_responders, r.targeted_customers),
+        pct(r.control_responders, r.control_customers),
+        liftPP(r.targeted_responders, r.targeted_customers, r.control_responders, r.control_customers),
+      ].join(','))
+      dl([headers.join(','), ...rows].join('\n'), `reload-data-${selectedMonth.replace(' ', '-')}.csv`)
+      return
+    }
+
+    if (type === 'funnel') {
+      const headers = ['Date', 'Funnel', 'Targeted', 'Control', 'Responders', 'Conv %', 'Ctrl Conv %', 'Conv vs Control']
+      // Aggregate per date+label
+      const dateLabels = []
+      const dates = [...new Set(funnelData.map(r => r.data_date))].sort()
+      dates.forEach(date => {
+        const labels = [...new Set(funnelData.filter(r => r.data_date === date).map(r => r.funnel_label))].sort()
+        labels.forEach(label => {
+          const rows = funnelData.filter(r => r.data_date === date && r.funnel_label === label)
+          const tot = rows.reduce((a, r) => ({ t: a.t+(r.targeted_customers||0), c: a.c+(r.control_customers||0), r: a.r+(r.targeted_responders||0), cr: a.cr+(r.control_responders||0) }), {t:0,c:0,r:0,cr:0})
+          dateLabels.push([date, label, tot.t, tot.c, tot.r, pct(tot.r, tot.t), pct(tot.cr, tot.c), liftPP(tot.r, tot.t, tot.cr, tot.c)].join(','))
+        })
+      })
+      dl([headers.join(','), ...dateLabels].join('\n'), `funnel-data-${selectedMonth.replace(' ', '-')}.csv`)
+      return
+    }
+
+    // Promos (Ad-Hoc + Promo Code)
     const exportPromos = domainFilter === 'All' ? promos : promos.filter(p => p.domain === domainFilter)
-
-    const headers = ['Reporting Tag','Promotion Name','Domain','Type','Sub-type','Lifecycle','Value Segment','Product','Start Date','End Date','Ongoing','Opt-in','Offer Description','Reward Type','Reward Value','Max Cap','Min Deposit','Targeted','Opt-ins','Participants','Depositors','Conversion %','Control Group','Control Responders','Deposit Volume','Total Stakes','Bonus Cost','GGR','NGR','Bonus/GGR %','ROI %','Status','Notes']
-
+    const headers = ['Date','Name','Domain','Type','Reporting Tag','Reward Type','Trigger Type','Targeted','Depositors','Bonus Cost','GGR','B/GGR %','NGR','Status']
     const rows = exportPromos.map(p => {
-      const conv = p.depositors && p.targeted_count ? ((Number(p.depositors) / Number(p.targeted_count)) * 100).toFixed(1) : ''
-      const bggr = p.bonus_cost && p.ggr ? ((Number(p.bonus_cost) / Number(p.ggr)) * 100).toFixed(1) : ''
-      const roi = p.bonus_cost && p.ngr ? (((Number(p.ngr) - Number(p.bonus_cost)) / Number(p.bonus_cost)) * 100).toFixed(1) : ''
-      return [
-        p.reporting_tag || '', p.name || '', p.domain || '', p.type || '', p.subtype || '',
-        p.lifecycle_stage || '', p.value_segment || '', p.product_preference || '',
-        p.start_date || '', p.end_date || '', p.ongoing ? 'Yes' : 'No', p.opt_in ? 'Yes' : 'No',
-        `"${(p.offer_description || '').replace(/"/g, '""')}"`,
-        p.reward_type || '', p.reward_value ? `${p.reward_value}${p.reward_unit || ''}` : '', p.max_reward_cap || '',
-        p.min_deposit || '', p.targeted_count || '', p.opt_in_count || '', p.participants || '',
-        p.depositors || '', conv, p.control_group_count || '', p.control_group_responders || '',
-        p.deposit_volume || '', p.total_stakes || '', p.bonus_cost || '', p.ggr || '', p.ngr || '',
-        bggr, roi, p.status || '', `"${(p.notes || '').replace(/"/g, '""')}"`
-      ].join(',')
+      const bggr = p.bonus_cost && p.ggr ? ((Number(p.bonus_cost)/Number(p.ggr))*100).toFixed(1)+'%' : ''
+      return [p.start_date||'', `"${(p.name||'').replace(/"/g,'""')}"`, p.domain||'', p.type||'', p.reporting_tag||'', p.reward_type||'', p.trigger_type||'', p.targeted_count||'', p.depositors||'', p.bonus_cost||'', p.ggr||'', bggr, p.ngr||'', p.status||''].join(',')
     })
-
     const csv = [headers.join(','), ...rows].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `promotrack-${selectedMonth.replace(' ', '-')}-${domainFilter}.csv`
+    a.download = `promos-${selectedMonth.replace(' ', '-')}-${domainFilter}.csv`
     a.click()
     URL.revokeObjectURL(url)
     notify('CSV exported ✓')
@@ -401,7 +431,11 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
                 <span style={{ fontSize: '0.76rem', color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>{tabPromos.length} promotion{tabPromos.length !== 1 ? 's' : ''}</span>
                 {Object.entries(statusCounts).map(([s, c]) => <span key={s} className={`tag tag-${s}`}>{c} {s}</span>)}
               </div>
-              <button className="btn-ghost" style={{ fontSize: '0.78rem' }} onClick={handleExportCSV}>⬇ Export CSV</button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button className="btn-ghost" style={{ fontSize: '0.78rem' }} onClick={() => handleExportCSV('promos')}>⬇ Promos CSV</button>
+                <button className="btn-ghost" style={{ fontSize: '0.78rem' }} onClick={() => handleExportCSV('reload')}>⬇ Reload CSV</button>
+                <button className="btn-ghost" style={{ fontSize: '0.78rem' }} onClick={() => handleExportCSV('funnel')}>⬇ Funnel CSV</button>
+              </div>
             </div>
             <div style={{ overflowX: 'auto', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
@@ -598,70 +632,61 @@ function ReloadOverviewSection({ reloadData }) {
 
   const fmtN = v => v ? Number(v).toLocaleString('tr-TR') : '0'
   const pct = (a, b) => (a > 0 && b > 0) ? ((a / b) * 100).toFixed(1) + '%' : '—'
-  const lift = (tR, tT, cR, cT) => {
+  const liftPP = (tR, tT, cR, cT) => {
     if (!tT || !cT) return null
     return ((tR / tT) - (cR / cT)) * 100
   }
 
-  // Get most recent period
+  const VALUE_ORDER = ['HV', 'MV', 'LHV', 'LLV', 'NV', 'EV', '']
   const periods = [...new Map(reloadData.map(r => [`${r.range_start}||${r.range_end}`, { start: r.range_start, end: r.range_end }])).values()]
     .sort((a, b) => b.start.localeCompare(a.start))
   const latest = periods[0]
   if (!latest) return null
 
-  const latestRows = reloadData.filter(r => r.range_start === latest.start && r.range_end === latest.end && !r.is_reminder)
-  const VALUE_ORDER = ['HV', 'MV', 'LHV', 'LLV', 'NV', 'EV', '']
-
-  // Group by lifecycle+product
-  const groups = {}
-  latestRows.forEach(r => {
-    const k = `${r.lifecycle}|${r.product}`
-    if (!groups[k]) groups[k] = { lifecycle: r.lifecycle, product: r.product, rows: [] }
-    groups[k].rows.push(r)
-  })
+  const rows = reloadData
+    .filter(r => r.range_start === latest.start && r.range_end === latest.end && !r.is_reminder)
+    .sort((a, b) => {
+      const lc = a.lifecycle.localeCompare(b.lifecycle)
+      if (lc !== 0) return lc
+      return VALUE_ORDER.indexOf(a.value_segment) - VALUE_ORDER.indexOf(b.value_segment)
+    })
 
   return (
     <div style={{ marginTop: '24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-        <div className="section-heading" style={{ margin: 0 }}>🔄 Reload Data — {latest.start} to {latest.end}</div>
-        <span style={{ fontSize: '0.72rem', color: 'var(--text3)' }}>Latest period · {periods.length} total upload{periods.length !== 1 ? 's' : ''}</span>
+        <div className="section-heading" style={{ margin: 0 }}>🔄 Reload — {latest.start} to {latest.end}</div>
+        <span style={{ fontSize: '0.72rem', color: 'var(--text3)' }}>{periods.length} period{periods.length !== 1 ? 's' : ''} uploaded</span>
       </div>
       <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
           <thead>
             <tr style={{ background: 'var(--bg3)' }}>
-              {['Segment', 'Value', 'Product', 'Targeted', 'Responders', 'Conv %', 'Ctrl Conv %', 'Lift'].map(h => (
+              {['Date', 'Segment', 'Value', 'Targeted', 'Responders', 'Conv %', 'Ctrl Conv %', 'Conv vs Control'].map(h => (
                 <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text2)', fontWeight: 500, fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {Object.values(groups).sort((a, b) => a.lifecycle.localeCompare(b.lifecycle)).map(g => {
-              const sorted = [...g.rows].sort((a, b) => VALUE_ORDER.indexOf(a.value_segment) - VALUE_ORDER.indexOf(b.value_segment))
-              return sorted.map((r, i) => {
-                const liftVal = lift(r.targeted_responders, r.targeted_customers, r.control_responders, r.control_customers)
-                const ctrlConv = pct(r.control_responders, r.control_customers)
-                return (
-                  <tr key={`${g.lifecycle}${g.product}${i}`} style={{ borderBottom: '1px solid var(--border)' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <td style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-                      {`${g.lifecycle} ${g.product}`}
-                    </td>
-                    <td style={{ padding: '8px 12px' }}>
-                      {r.value_segment ? <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'var(--bg3)', border: '1px solid var(--border)', fontWeight: 700 }}>{r.value_segment}</span> : '—'}
-                    </td>
-                    <td style={{ padding: '8px 12px', fontSize: '0.74rem', color: 'var(--text2)' }}>{r.product}</td>
-                    <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)' }}>{fmtN(r.targeted_customers)}</td>
-                    <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--success)' }}>{fmtN(r.targeted_responders)}</td>
-                    <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent)' }}>{pct(r.targeted_responders, r.targeted_customers)}</td>
-                    <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', color: 'var(--text2)' }}>{ctrlConv}</td>
-                    <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 700, color: liftVal === null ? 'var(--text3)' : liftVal > 0 ? 'var(--success)' : 'var(--danger)' }}>
-                      {liftVal !== null ? `${liftVal > 0 ? '+' : ''}${liftVal.toFixed(1)}pp` : '—'}
-                    </td>
-                  </tr>
-                )
-              })
+            {rows.map((r, i) => {
+              const liftVal = liftPP(r.targeted_responders, r.targeted_customers, r.control_responders, r.control_customers)
+              return (
+                <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: 'var(--text2)', whiteSpace: 'nowrap' }}>{latest.start === latest.end ? latest.start : `${latest.start} → ${latest.end}`}</td>
+                  <td style={{ padding: '8px 12px', fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{r.lifecycle} {r.product}</td>
+                  <td style={{ padding: '8px 12px' }}>
+                    {r.value_segment ? <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'var(--bg3)', border: '1px solid var(--border)', fontWeight: 700 }}>{r.value_segment}</span> : '—'}
+                  </td>
+                  <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)' }}>{fmtN(r.targeted_customers)}</td>
+                  <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--success)' }}>{fmtN(r.targeted_responders)}</td>
+                  <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent)' }}>{pct(r.targeted_responders, r.targeted_customers)}</td>
+                  <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', color: 'var(--text2)' }}>{pct(r.control_responders, r.control_customers)}</td>
+                  <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 700, color: liftVal === null ? 'var(--text3)' : liftVal > 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {liftVal !== null ? `${liftVal > 0 ? '+' : ''}${liftVal.toFixed(1)}pp` : '—'}
+                  </td>
+                </tr>
+              )
             })}
           </tbody>
         </table>
@@ -670,25 +695,18 @@ function ReloadOverviewSection({ reloadData }) {
   )
 }
 
-// Funnel summary for Overview tab — one row per funnel label per date
 function FunnelOverviewSection({ funnelData }) {
   if (!funnelData || funnelData.length === 0) return null
 
   const fmtN = v => v ? Number(v).toLocaleString('tr-TR') : '0'
   const pct = (a, b) => (a > 0 && b > 0) ? ((a / b) * 100).toFixed(1) + '%' : '—'
-  const lift = (tR, tT, cR, cT) => {
+  const liftPP = (tR, tT, cR, cT) => {
     if (!tT || !cT) return null
     return ((tR / tT) - (cR / cT)) * 100
   }
 
-  // Group by date then funnel_label
   const dates = [...new Set(funnelData.map(r => r.data_date))].sort().reverse()
-
-  // For overview show last 3 dates to keep it scannable
   const recentDates = dates.slice(0, 3)
-
-  // Unique funnel labels that have data
-  const labels = [...new Set(funnelData.map(r => r.funnel_label))].sort()
 
   const agg = (rows) => rows.reduce((acc, r) => ({
     targeted: acc.targeted + (r.targeted_customers || 0),
@@ -700,14 +718,14 @@ function FunnelOverviewSection({ funnelData }) {
   return (
     <div style={{ marginTop: '24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-        <div className="section-heading" style={{ margin: 0 }}>📡 Funnel Data — Recent {recentDates.length} Days</div>
+        <div className="section-heading" style={{ margin: 0 }}>📡 Funnel — Recent {recentDates.length} Days</div>
         <span style={{ fontSize: '0.72rem', color: 'var(--text3)' }}>{dates.length} total upload{dates.length !== 1 ? 's' : ''}</span>
       </div>
       <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
           <thead>
             <tr style={{ background: 'var(--bg3)' }}>
-              {['Date', 'Funnel', 'Targeted', 'Control', 'Responders', 'Conv %', 'Ctrl Conv %', 'Lift'].map(h => (
+              {['Date', 'Funnel', 'Targeted', 'Control', 'Responders', 'Conv %', 'Ctrl Conv %', 'Conv vs Control'].map(h => (
                 <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text2)', fontWeight: 500, fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
@@ -715,25 +733,21 @@ function FunnelOverviewSection({ funnelData }) {
           <tbody>
             {recentDates.map(date => {
               const dateRows = funnelData.filter(r => r.data_date === date)
-              const dateLabels = [...new Set(dateRows.map(r => r.funnel_label))].sort()
-              return dateLabels.map((label, i) => {
-                const rows = dateRows.filter(r => r.funnel_label === label)
-                const tot = agg(rows)
-                const liftVal = lift(tot.responders, tot.targeted, tot.ctrl_resp, tot.control)
-                const ctrlConv = pct(tot.ctrl_resp, tot.control)
+              const labels = [...new Set(dateRows.map(r => r.funnel_label))].sort()
+              return labels.map((label) => {
+                const tot = agg(dateRows.filter(r => r.funnel_label === label))
+                const liftVal = liftPP(tot.responders, tot.targeted, tot.ctrl_resp, tot.control)
                 return (
                   <tr key={`${date}-${label}`} style={{ borderBottom: '1px solid var(--border)' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: 'var(--text2)', fontWeight: i === 0 ? 600 : 400 }}>
-                      {i === 0 ? date : ''}
-                    </td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: 'var(--text2)', whiteSpace: 'nowrap' }}>{date}</td>
                     <td style={{ padding: '7px 12px', fontWeight: 500, fontSize: '0.75rem' }}>{label}</td>
                     <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)' }}>{fmtN(tot.targeted)}</td>
                     <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)', color: 'var(--text2)' }}>{fmtN(tot.control)}</td>
                     <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--success)' }}>{fmtN(tot.responders)}</td>
                     <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent)' }}>{pct(tot.responders, tot.targeted)}</td>
-                    <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)', color: 'var(--text2)' }}>{ctrlConv}</td>
+                    <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)', color: 'var(--text2)' }}>{pct(tot.ctrl_resp, tot.control)}</td>
                     <td style={{ padding: '7px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 700, color: liftVal === null ? 'var(--text3)' : liftVal > 0 ? 'var(--success)' : 'var(--danger)' }}>
                       {liftVal !== null ? `${liftVal > 0 ? '+' : ''}${liftVal.toFixed(1)}pp` : '—'}
                     </td>

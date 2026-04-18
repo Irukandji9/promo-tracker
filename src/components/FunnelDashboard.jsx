@@ -142,7 +142,7 @@ export default function FunnelDashboard({ onUpload }) {
   // Chart series — one per funnel group across all dates
   const seriesData = useMemo(() => FUNNEL_GROUPS.map(g => {
     const points = dates.map(d => {
-      const rows = allData.filter(r => r.data_date === d && r.funnel_label === g.key)
+      const rows = allData.filter(r => r.data_date === d && r.funnel_label === g.key && (dateFilter === 'all' || r.data_date === dateFilter))
       const t = agg(rows)
       return { conv: t.targeted > 0 ? (t.responders / t.targeted) * 100 : 0 }
     })
@@ -189,8 +189,8 @@ export default function FunnelDashboard({ onUpload }) {
         </div>
         <button className="btn-analysis" style={{ fontSize: '0.78rem', padding: '5px 12px' }} onClick={onUpload}>📡 Upload CSV</button>
       </div>
-      {/* Date filter — shown when drilling into a group */}
-      {expandedGroup && dates.length > 0 && (
+      {/* Date filter — shown on main view and drill-down */}
+      {dates.length > 0 && (
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '14px' }}>
           <span style={{ fontSize: '0.7rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Filter</span>
           <button onClick={() => setDateFilter('all')} style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '0.74rem', fontWeight: 500, border: '1px solid', cursor: 'pointer', background: dateFilter === 'all' ? 'var(--accent)' : 'transparent', borderColor: dateFilter === 'all' ? 'var(--accent)' : 'var(--border)', color: dateFilter === 'all' ? '#fff' : 'var(--text2)' }}>All dates</button>
@@ -209,7 +209,7 @@ export default function FunnelDashboard({ onUpload }) {
           <div className="section-heading">Funnel Performance — click to view daily breakdown</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '10px' }}>
             {FUNNEL_GROUPS.map(g => {
-              const rows = allData.filter(r => r.funnel_label === g.key)
+              const rows = (dateFilter === 'all' ? allData : allData.filter(r => r.data_date === dateFilter)).filter(r => r.funnel_label === g.key)
               if (!rows.length) return null
               const tot = agg(rows)
               const convRate = pct(tot.responders, tot.targeted)
