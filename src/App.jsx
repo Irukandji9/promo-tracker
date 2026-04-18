@@ -328,7 +328,7 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
           <span style={{ fontSize: '0.67rem', color: 'var(--text3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: '10px', borderLeft: '1px solid var(--border)' }}>Hepsibahis CRM</span>
         </div>
         <div style={{ display: 'flex', gap: '7px', alignItems: 'center' }}>
-          <button className="btn-analysis" style={{ padding: '7px 14px', fontSize: '0.8rem' }} onClick={() => setShowAnalysis(true)} disabled={promos.length === 0}>🧠 Monthly Analysis</button>
+          <button className="btn-analysis" style={{ padding: '7px 14px', fontSize: '0.8rem' }} onClick={() => setShowAnalysis(true)}>🧠 Monthly Analysis</button>
           <button className="btn-primary" onClick={() => { setEditPromo(null); setShowForm(true) }}>+ New Promo</button>
           <div style={{ width: '1px', height: '20px', background: 'var(--border)', margin: '0 2px' }} />
           <span style={{ fontSize: '0.72rem', color: 'var(--text3)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session?.user?.email}</span>
@@ -562,7 +562,7 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
       {/* MODALS */}
       {showForm && <PromoForm promo={editPromo} onSave={handleSavePromo} onClose={() => { setShowForm(false); setEditPromo(null) }} />}
       {kpiPromo && <KpiForm promo={promos.find(p => p.id === kpiPromo.id) || kpiPromo} onSave={handleSaveKpi} onClose={() => setKpiPromo(null)} onAnalyse={handleAnalyse} />}
-      {showAnalysis && <MonthlyAnalysis promos={promos} month={selectedMonth} monthEvents={monthEvents} domainFilter={domainFilter} onClose={() => setShowAnalysis(false)} />}
+      {showAnalysis && <MonthlyAnalysis promos={promos} month={selectedMonth} monthEvents={monthEvents} domainFilter={domainFilter} activeTab={activeTab} reloadData={reloadData} funnelData={funnelData} onClose={() => setShowAnalysis(false)} />}
       {showFunnelUpload && <FunnelUpload onClose={() => { setShowFunnelUpload(false); setFunnelRefreshKey(k => k + 1) }} onSuccess={() => {}} />}
       {showReloadUpload && <ReloadUpload onClose={() => { setShowReloadUpload(false); setReloadRefreshKey(k => k + 1) }} onSuccess={() => {}} />}
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}

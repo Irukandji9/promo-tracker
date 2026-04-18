@@ -59,11 +59,17 @@ function CategoryBlock({ title, icon, promos, color }) {
   )
 }
 
-export default function MonthlyAnalysis({ promos, month, monthEvents, domainFilter, onClose }) {
+export default function MonthlyAnalysis({ promos, month, monthEvents, domainFilter, activeTab, reloadData, funnelData, onClose }) {
   const [analysis, setAnalysis] = useState(null)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
+
+  // Context-aware title and data
+  const contextLabel = activeTab === 'Reload' ? 'Reload' : activeTab === 'Funnel' ? 'Funnel' : activeTab === 'Promo Code' ? 'Promo Code' : activeTab === 'Ad-Hoc' ? 'Ad-Hoc' : 'All'
+  const isReload = activeTab === 'Reload'
+  const isFunnel = activeTab === 'Funnel'
+  const isPromoOnly = activeTab === 'Promo Code' || activeTab === 'Ad-Hoc'
 
   const filtered = domainFilter && domainFilter !== 'All' ? promos.filter(p => p.domain === domainFilter) : promos
   const withKpis = filtered.filter(p => p.bonus_cost)
@@ -135,6 +141,51 @@ Keep each section concise. Total 500-650 words.`
   }
 
   const handleGenerate = async () => {
+    // Build context-appropriate prompt
+    if (isReload || isFunnel) {
+      setGenerating(true)
+      setError(null)
+      try {
+        const data = isReload ? reloadData : funnelData
+        const agg = rows => rows.reduce((a,r) => ({ t: a.t+(r.targeted_customers||0), resp: a.resp+(r.targeted_responders||0), ctrl: a.ctrl+(r.control_customers||0), cr: a.cr+(r.control_responders||0) }), {t:0,resp:0,ctrl:0,cr:0})
+        const groupKey = isReload ? (r => `${r.lifecycle} ${r.product}`) : (r => r.funnel_label)
+        const groups = [...new Set(data.map(groupKey).filter(Boolean))].sort()
+        const dates = [...new Set(data.map(r => r.data_date).filter(Boolean))].sort()
+
+        const detail = groups.map(g => {
+          const rows = data.filter(r => groupKey(r) === g)
+          const t = agg(rows)
+          const conv = t.t > 0 ? ((t.resp/t.t)*100).toFixed(1) : '—'
+          const lift = t.t > 0 && t.ctrl > 0 ? (((t.resp/t.t)-(t.cr/t.ctrl))*100).toFixed(1) : null
+          return `  ${g}: ${t.t} targeted → ${t.resp} responders (${conv}% conv${lift ? `, lift: ${Number(lift)>=0?'+':''}${lift}pp` : ''})`
+        }).join('\n')
+
+        const prompt = `You are a senior CRM Analyst at Hepsibahis, an online sports betting and casino in the Turkish market.
+
+Analyse this ${isReload ? 'Reload' : 'Funnel'} performance summary for ${month} and provide a sharp monthly assessment.
+
+Period: ${dates[0]} to ${dates[dates.length-1]} (${dates.length} days)
+
+${isReload ? 'Lifecycle Group' : 'Funnel Group'} breakdown:
+${detail}
+
+Write a concise monthly analysis (max 300 words, no headers, flowing paragraphs):
+1. Overall verdict for the month — is performance strong, mixed or weak?
+2. Which groups are performing well vs underperforming — be specific with numbers
+3. Notable trends across the period
+4. Two or three specific, actionable recommendations
+Be direct and commercially focused.`
+
+        const res = await fetch('/api/monthly-analysis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) })
+        const d = await res.json()
+        if (d.error) throw new Error(d.error)
+        setAnalysis(d.result)
+        setActiveTab('analysis')
+      } catch (e) { setError(e.message) }
+      setGenerating(false)
+      return
+    }
+  
     setGenerating(true)
     setError(null)
     try {
@@ -186,9 +237,11 @@ Keep each section concise. Total 500-650 words.`
       <div className="modal modal-lg" style={{ maxWidth: '860px' }}>
         <div className="modal-header">
           <div>
-            <h2>🧠 Monthly CRM Analysis — {month}</h2>
+            <h2>🧠 {contextLabel} Analysis — {month}</h2>
             <p style={{ fontSize: '0.78rem', color: 'var(--text2)', marginTop: '2px' }}>
-              {domainFilter && domainFilter !== 'All' ? domainFilter : 'All Domains'} · {filtered.length} promotions · {withKpis.length} with KPI data · {allBreaches.length} threshold breach{allBreaches.length !== 1 ? 'es' : ''}
+              {isReload ? `${[...new Set((reloadData||[]).map(r=>r.data_date).filter(Boolean))].length} days uploaded · ${(reloadData||[]).length} segments` :
+               isFunnel ? `${[...new Set((funnelData||[]).map(r=>r.data_date).filter(Boolean))].length} days uploaded · ${[...new Set((funnelData||[]).map(r=>r.funnel_label).filter(Boolean))].length} funnel groups` :
+               `${domainFilter && domainFilter !== 'All' ? domainFilter : 'All Domains'} · ${filtered.length} promotions · ${withKpis.length} with KPI data · ${allBreaches.length} threshold breach${allBreaches.length !== 1 ? 'es' : ''}`}
             </p>
           </div>
           <button className="close-btn" onClick={onClose}>×</button>
@@ -211,47 +264,129 @@ Keep each section concise. Total 500-650 words.`
         <div className="modal-body">
           {activeTab === 'overview' && (
             <>
-              <div className="section-heading">Month Totals{domainFilter && domainFilter !== 'All' ? ` — ${domainFilter}` : ''}</div>
-              <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', marginBottom: '18px' }}>
-                <div className="stat-card"><div className="stat-label">Promotions</div><div className="stat-value">{filtered.length}</div></div>
-                <div className="stat-card"><div className="stat-label">Targeted</div><div className="stat-value">{fmtN(totals.targeted)}</div></div>
-                <div className="stat-card"><div className="stat-label">Depositors</div><div className="stat-value">{fmtN(totals.depositors)}</div></div>
-                <div className="stat-card"><div className="stat-label">Bonus Cost</div><div className="stat-value negative">{fmt(totals.bonus_cost)}</div></div>
-                <div className="stat-card"><div className="stat-label">GGR</div><div className="stat-value">{fmt(totals.ggr)}</div></div>
-                <div className="stat-card"><div className="stat-label">NGR</div><div className={`stat-value ${totals.ngr >= 0 ? 'positive' : 'negative'}`}>{fmt(totals.ngr)}</div></div>
-                <div className="stat-card"><div className="stat-label">Bonus/GGR</div><div className="stat-value" style={{ color: ratioColor(overallBGgr) }}>{overallBGgr ? overallBGgr + '%' : '—'}</div></div>
-                <div className="stat-card"><div className="stat-label">ROI</div><div className={`stat-value ${Number(overallRoi) >= 0 ? 'positive' : 'negative'}`}>{overallRoi ? overallRoi + '%' : '—'}</div></div>
-              </div>
+              {/* RELOAD OVERVIEW */}
+              {isReload && (() => {
+                const rd = reloadData || []
+                const dates = [...new Set(rd.map(r => r.data_date).filter(Boolean))].sort()
+                const groups = [...new Set(rd.map(r => `${r.lifecycle} ${r.product}`))].sort()
+                const agg = rows => rows.reduce((a,r) => ({ t: a.t+(r.targeted_customers||0), resp: a.resp+(r.targeted_responders||0), ctrl: a.ctrl+(r.control_customers||0), cr: a.cr+(r.control_responders||0) }), {t:0,resp:0,ctrl:0,cr:0})
+                const tot = agg(rd)
+                return (
+                  <>
+                    <div className="section-heading">Reload Totals — {month}</div>
+                    <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', marginBottom: '18px' }}>
+                      <div className="stat-card"><div className="stat-label">Days Uploaded</div><div className="stat-value">{dates.length}</div></div>
+                      <div className="stat-card"><div className="stat-label">Total Targeted</div><div className="stat-value">{fmtN(tot.t)}</div></div>
+                      <div className="stat-card"><div className="stat-label">Total Responders</div><div className="stat-value positive">{fmtN(tot.resp)}</div></div>
+                      <div className="stat-card"><div className="stat-label">Overall Conv %</div><div className="stat-value">{tot.t > 0 ? ((tot.resp/tot.t)*100).toFixed(1)+'%' : '—'}</div></div>
+                    </div>
+                    <div className="section-heading">By Lifecycle Group</div>
+                    {groups.map(g => {
+                      const rows = rd.filter(r => `${r.lifecycle} ${r.product}` === g)
+                      const t = agg(rows)
+                      const conv = t.t > 0 ? ((t.resp/t.t)*100).toFixed(1) : null
+                      const lift = t.t > 0 && t.ctrl > 0 ? (((t.resp/t.t)-(t.cr/t.ctrl))*100).toFixed(1) : null
+                      return (
+                        <div key={g} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{g}</div>
+                          <div style={{ display: 'flex', gap: '16px', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>
+                            <span style={{ color: 'var(--text2)' }}>Targeted: <strong style={{ color: 'var(--text)' }}>{fmtN(t.t)}</strong></span>
+                            <span style={{ color: 'var(--success)' }}>Resp: <strong>{fmtN(t.resp)}</strong></span>
+                            <span style={{ color: 'var(--accent)' }}>Conv: <strong>{conv ? conv+'%' : '—'}</strong></span>
+                            {lift && <span style={{ color: Number(lift) >= 0 ? 'var(--success)' : 'var(--danger)' }}>Lift: <strong>{Number(lift) >= 0 ? '+' : ''}{lift}pp</strong></span>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </>
+                )
+              })()}
 
-              {top && worst && top.id !== worst.id && (
+              {/* FUNNEL OVERVIEW */}
+              {isFunnel && (() => {
+                const fd = funnelData || []
+                const dates = [...new Set(fd.map(r => r.data_date).filter(Boolean))].sort()
+                const labels = [...new Set(fd.map(r => r.funnel_label).filter(Boolean))].sort()
+                const agg = rows => rows.reduce((a,r) => ({ t: a.t+(r.targeted_customers||0), resp: a.resp+(r.targeted_responders||0), ctrl: a.ctrl+(r.control_customers||0), cr: a.cr+(r.control_responders||0) }), {t:0,resp:0,ctrl:0,cr:0})
+                const tot = agg(fd)
+                return (
+                  <>
+                    <div className="section-heading">Funnel Totals — {month}</div>
+                    <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', marginBottom: '18px' }}>
+                      <div className="stat-card"><div className="stat-label">Days Uploaded</div><div className="stat-value">{dates.length}</div></div>
+                      <div className="stat-card"><div className="stat-label">Total Targeted</div><div className="stat-value">{fmtN(tot.t)}</div></div>
+                      <div className="stat-card"><div className="stat-label">Total Responders</div><div className="stat-value positive">{fmtN(tot.resp)}</div></div>
+                      <div className="stat-card"><div className="stat-label">Overall Conv %</div><div className="stat-value">{tot.t > 0 ? ((tot.resp/tot.t)*100).toFixed(1)+'%' : '—'}</div></div>
+                    </div>
+                    <div className="section-heading">By Funnel Group</div>
+                    {labels.map(label => {
+                      const rows = fd.filter(r => r.funnel_label === label)
+                      const t = agg(rows)
+                      const conv = t.t > 0 ? ((t.resp/t.t)*100).toFixed(1) : null
+                      const lift = t.t > 0 && t.ctrl > 0 ? (((t.resp/t.t)-(t.cr/t.ctrl))*100).toFixed(1) : null
+                      return (
+                        <div key={label} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 14px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{label}</div>
+                          <div style={{ display: 'flex', gap: '16px', fontFamily: 'var(--font-mono)', fontSize: '0.8rem' }}>
+                            <span style={{ color: 'var(--text2)' }}>Targeted: <strong style={{ color: 'var(--text)' }}>{fmtN(t.t)}</strong></span>
+                            <span style={{ color: 'var(--success)' }}>Resp: <strong>{fmtN(t.resp)}</strong></span>
+                            <span style={{ color: 'var(--accent)' }}>Conv: <strong>{conv ? conv+'%' : '—'}</strong></span>
+                            {lift && <span style={{ color: Number(lift) >= 0 ? 'var(--success)' : 'var(--danger)' }}>Lift: <strong>{Number(lift) >= 0 ? '+' : ''}{lift}pp</strong></span>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </>
+                )
+              })()}
+
+              {/* PROMO OVERVIEW (existing) */}
+              {!isReload && !isFunnel && (
                 <>
-                  <div className="section-heading">Highlights</div>
-                  <div className="form-row" style={{ marginBottom: '16px' }}>
-                    <div style={{ background: 'rgba(22,163,74,0.05)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '8px', padding: '12px 14px' }}>
-                      <div style={{ fontSize: '0.68rem', color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>🏆 Top Performer</div>
-                      <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>{top.name}</div>
-                      <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--success)', fontSize: '0.85rem' }}>NGR: {fmt(top.ngr)}</div>
-                    </div>
-                    <div style={{ background: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '8px', padding: '12px 14px' }}>
-                      <div style={{ fontSize: '0.68rem', color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>📉 Needs Review</div>
-                      <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>{worst.name}</div>
-                      <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--danger)', fontSize: '0.85rem' }}>NGR: {fmt(worst.ngr)}</div>
-                    </div>
+                  <div className="section-heading">Month Totals{domainFilter && domainFilter !== 'All' ? ` — ${domainFilter}` : ''}</div>
+                  <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', marginBottom: '18px' }}>
+                    <div className="stat-card"><div className="stat-label">Promotions</div><div className="stat-value">{filtered.length}</div></div>
+                    <div className="stat-card"><div className="stat-label">Targeted</div><div className="stat-value">{fmtN(totals.targeted)}</div></div>
+                    <div className="stat-card"><div className="stat-label">Depositors</div><div className="stat-value">{fmtN(totals.depositors)}</div></div>
+                    <div className="stat-card"><div className="stat-label">Bonus Cost</div><div className="stat-value negative">{fmt(totals.bonus_cost)}</div></div>
+                    <div className="stat-card"><div className="stat-label">GGR</div><div className="stat-value">{fmt(totals.ggr)}</div></div>
+                    <div className="stat-card"><div className="stat-label">NGR</div><div className={`stat-value ${totals.ngr >= 0 ? 'positive' : 'negative'}`}>{fmt(totals.ngr)}</div></div>
+                    <div className="stat-card"><div className="stat-label">Bonus/GGR</div><div className="stat-value" style={{ color: ratioColor(overallBGgr) }}>{overallBGgr ? overallBGgr + '%' : '—'}</div></div>
+                    <div className="stat-card"><div className="stat-label">ROI</div><div className={`stat-value ${Number(overallRoi) >= 0 ? 'positive' : 'negative'}`}>{overallRoi ? overallRoi + '%' : '—'}</div></div>
                   </div>
+                  {top && worst && top.id !== worst.id && (
+                    <>
+                      <div className="section-heading">Highlights</div>
+                      <div className="form-row" style={{ marginBottom: '16px' }}>
+                        <div style={{ background: 'rgba(22,163,74,0.05)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: '8px', padding: '12px 14px' }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>🏆 Top Performer</div>
+                          <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>{top.name}</div>
+                          <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--success)', fontSize: '0.85rem' }}>NGR: {fmt(top.ngr)}</div>
+                        </div>
+                        <div style={{ background: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: '8px', padding: '12px 14px' }}>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>📉 Needs Review</div>
+                          <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '2px' }}>{worst.name}</div>
+                          <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--danger)', fontSize: '0.85rem' }}>NGR: {fmt(worst.ngr)}</div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  <div className="section-heading">By Category</div>
+                  {activeTab === 'Promo Code' ? <CategoryBlock title="Promo Code Campaigns" icon="🏷️" promos={promoCodes} color="#16a34a" /> :
+                   activeTab === 'Ad-Hoc' ? <CategoryBlock title="Ad-Hoc Promotions" icon="🎯" promos={adhoc} color="#e8a020" /> : (
+                    <>
+                      <CategoryBlock title="Ad-Hoc Promotions" icon="🎯" promos={adhoc} color="#e8a020" />
+                      <CategoryBlock title="Promo Code Campaigns" icon="🏷️" promos={promoCodes} color="#16a34a" />
+                    </>
+                  )}
                 </>
               )}
 
-              <div className="section-heading">By Category</div>
-              <CategoryBlock title="Ad-Hoc Promotions" icon="🎯" promos={adhoc} color="#e8a020" />
-              <CategoryBlock title="Promo Code Campaigns" icon="🏷️" promos={promoCodes} color="#16a34a" />
-              <CategoryBlock title="Reload Promotions" icon="🔄" promos={reloads} color="#1a6ef5" />
-              <CategoryBlock title="Funnel Campaigns" icon="📡" promos={funnels} color="#7c3aed" />
-
               <div style={{ textAlign: 'center', marginTop: '20px' }}>
-                <button className="btn-analysis" style={{ padding: '12px 28px', fontSize: '0.9rem' }} onClick={handleGenerate} disabled={generating || withKpis.length === 0}>
+                <button className="btn-analysis" style={{ padding: '12px 28px', fontSize: '0.9rem' }} onClick={handleGenerate} disabled={generating || (!isReload && !isFunnel && withKpis.length === 0)}>
                   {generating ? <><span className="spinner" style={{ marginRight: '10px' }} />Generating…</> : '🧠 Generate Full Monthly Analysis'}
                 </button>
-                {withKpis.length === 0 && <p style={{ fontSize: '0.78rem', color: 'var(--text3)', marginTop: '8px' }}>Enter KPI data on at least one promotion first</p>}
+                {!isReload && !isFunnel && withKpis.length === 0 && <p style={{ fontSize: '0.78rem', color: 'var(--text3)', marginTop: '8px' }}>Enter KPI data on at least one promotion first</p>}
                 {error && <p style={{ fontSize: '0.78rem', color: 'var(--danger)', marginTop: '8px' }}>{error}</p>}
               </div>
             </>

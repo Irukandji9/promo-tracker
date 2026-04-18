@@ -112,6 +112,8 @@ export default function FunnelDashboard({ onUpload }) {
   const [expandedGroup, setExpandedGroup] = useState(null)
   const [expandedDays, setExpandedDays] = useState({})
   const [targetFilter, setTargetFilter] = useState('all')
+  const [analysing, setAnalysing] = useState(false)
+  const [analysisResult, setAnalysisResult] = useState(null)
   const [dateFilter, setDateFilter] = useState('all')
 
   useEffect(() => { fetchAll() }, [])
@@ -150,7 +152,57 @@ export default function FunnelDashboard({ onUpload }) {
     return { ...g, points, hasData: points.some(p => p.conv > 0) }
   }), [allData, dates])
 
-  const handleExpandGroup = (key) => { setExpandedGroup(key); setTargetFilter('all'); setExpandedDays({}) }
+  const handleExpandGroup = (key) => { setExpandedGroup(key); setTargetFilter('all'); setExpandedDays({}); setAnalysisResult(null) }
+
+  const handleGroupAnalysis = async (g) => {
+    const groupRows = allData.filter(r => r.funnel_label === g.key)
+    if (!groupRows.length) return
+    setAnalysing(true)
+    setAnalysisResult(null)
+    const dates2 = [...new Set(groupRows.map(r => r.data_date))].sort()
+    const targets = [...new Set(groupRows.map(r => r.target_group))].sort()
+    const suffix = tg => { const parts = tg.split('_'); const dayIdx = parts.findIndex(p => p.toLowerCase().startsWith('day')); return dayIdx !== -1 ? parts.slice(dayIdx).join('_') : parts[parts.length-1] }
+    const targetDetail = targets.map(tg => {
+      const rows = groupRows.filter(r => r.target_group === tg)
+      const tot = rows.reduce((a,r) => ({ t: a.t+(r.targeted_customers||0), resp: a.resp+(r.targeted_responders||0), ctrl: a.ctrl+(r.control_customers||0), cr: a.cr+(r.control_responders||0) }), {t:0,resp:0,ctrl:0,cr:0})
+      const conv = tot.t > 0 ? ((tot.resp/tot.t)*100).toFixed(1) : '—'
+      const lift = tot.t > 0 && tot.ctrl > 0 ? (((tot.resp/tot.t)-(tot.cr/tot.ctrl))*100).toFixed(1) : null
+      return `  ${suffix(tg)}: ${tot.t} targeted → ${tot.resp} resp (${conv}% conv${lift ? `, lift: ${Number(lift)>=0?'+':''}${lift}pp` : ''})`
+    }).join('\n')
+    const dateDetail = dates2.map(d => {
+      const rows = groupRows.filter(r => r.data_date === d)
+      const tot = rows.reduce((a,r) => ({ t: a.t+(r.targeted_customers||0), resp: a.resp+(r.targeted_responders||0) }), {t:0,resp:0})
+      const conv = tot.t > 0 ? ((tot.resp/tot.t)*100).toFixed(1) : '—'
+      return `  ${d}: ${tot.t} targeted → ${tot.resp} resp (${conv}% conv)`
+    }).join('\n')
+    const prompt = `You are a senior CRM Analyst at Hepsibahis, an online sports betting and casino in the Turkish market.
+
+Analyse this specific funnel group and provide a focused commercial assessment.
+
+FUNNEL: ${g.label}
+Period: ${dates2[0]} to ${dates2[dates2.length-1]} (${dates2.length} days)
+
+Split breakdown (all-time):
+${targetDetail}
+
+Daily performance:
+${dateDetail}
+
+Write a concise analysis (max 250 words, no headers, flowing text):
+1. Overall verdict for this funnel — is it performing well?
+2. Which splits/target groups are strongest vs weakest — be specific
+3. Any notable daily trends
+4. One or two specific actionable recommendations
+Be direct and commercially focused.`
+
+    try {
+      const res = await fetch('/api/reload-analysis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setAnalysisResult(data.result)
+    } catch(e) { setAnalysisResult('Error: ' + e.message) }
+    setAnalysing(false)
+  }
 
   const toggleDay = (groupKey, date) => {
     const k = `${groupKey}||${date}`
@@ -253,10 +305,15 @@ export default function FunnelDashboard({ onUpload }) {
               {/* Group summary header */}
               <div style={{ background: 'var(--bg2)', border: `1px solid var(--border)`, borderLeft: `3px solid ${g.color}`, borderRadius: 'var(--radius-lg)', padding: '11px 16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', color: g.color }}>{g.label}</div>
-                <div style={{ display: 'flex', gap: '16px', fontSize: '0.78rem', fontFamily: 'var(--font-mono)' }}>
-                  <span style={{ color: 'var(--text2)' }}>All time targeted: <strong style={{ color: 'var(--text)' }}>{fmt(allTimeTot.targeted)}</strong></span>
-                  <span style={{ color: 'var(--success)' }}><strong>{fmt(allTimeTot.responders)}</strong> resp</span>
-                  <span style={{ color: 'var(--accent)' }}><strong>{pct(allTimeTot.responders, allTimeTot.targeted) || '—'}%</strong> conv</span>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '16px', fontSize: '0.78rem', fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ color: 'var(--text2)' }}>All time targeted: <strong style={{ color: 'var(--text)' }}>{fmt(allTimeTot.targeted)}</strong></span>
+                    <span style={{ color: 'var(--success)' }}><strong>{fmt(allTimeTot.responders)}</strong> resp</span>
+                    <span style={{ color: 'var(--accent)' }}><strong>{pct(allTimeTot.responders, allTimeTot.targeted) || '—'}%</strong> conv</span>
+                  </div>
+                  <button className="btn-analysis" style={{ fontSize: '0.75rem', padding: '5px 12px' }} onClick={() => handleGroupAnalysis(g)} disabled={analysing}>
+                    {analysing ? <><span className="spinner" style={{ marginRight: '6px', width: '12px', height: '12px', borderWidth: '2px' }} />Analysing…</> : '🧠 Analyse'}
+                  </button>
                 </div>
               </div>
 
@@ -297,6 +354,12 @@ export default function FunnelDashboard({ onUpload }) {
                   </>
                 )
               })()}
+              {analysisResult && (
+                <div style={{ background: 'rgba(14,165,233,0.05)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '16px', fontSize: '0.84rem', lineHeight: 1.65, color: 'var(--text)' }}>
+                  <div style={{ fontSize: '0.68rem', color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px', fontWeight: 700 }}>⚡ AI Analysis — {g.label}</div>
+                  {analysisResult}
+                </div>
+              )}
               <div className="section-heading">Daily breakdown — click + to see target groups for that day</div>
 
               <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>

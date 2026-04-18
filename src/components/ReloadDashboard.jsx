@@ -135,6 +135,8 @@ export default function ReloadDashboard({ onUpload }) {
   const [expandedDays, setExpandedDays] = useState({})
   const [dateFilter, setDateFilter] = useState('all')
   const [segmentFilter, setSegmentFilter] = useState('all')
+  const [analysing, setAnalysing] = useState(false)
+  const [analysisResult, setAnalysisResult] = useState(null)
 
   useEffect(() => { fetchAll() }, [])
 
@@ -176,7 +178,58 @@ export default function ReloadDashboard({ onUpload }) {
     return { ...g, points, hasData: points.some(p => p.conv > 0) }
   }), [allData, dates])
 
-  const handleExpandGroup = (key) => { setExpandedGroup(key); setSegmentFilter('all'); setExpandedDays({}) }
+  const handleExpandGroup = (key) => { setExpandedGroup(key); setSegmentFilter('all'); setExpandedDays({}); setAnalysisResult(null) }
+
+  const handleGroupAnalysis = async (g) => {
+    const rows = groupRows(g, allData)
+    if (!rows.length) return
+    setAnalysing(true)
+    setAnalysisResult(null)
+    const agg2 = r => ({ t: r.targeted_customers||0, resp: r.targeted_responders||0, ctrl: r.control_customers||0, cr: r.control_responders||0 })
+    const dates2 = [...new Set(rows.map(r => r.data_date))].sort()
+    const valueSegs = [...new Set(rows.map(r => r.value_segment).filter(Boolean))]
+    const VALUE_ORDER2 = ['HV','MV','LHV','LLV','NV','EV']
+    const segDetail = VALUE_ORDER2.filter(v => valueSegs.includes(v)).map(v => {
+      const vRows = rows.filter(r => r.value_segment === v)
+      const tot = vRows.reduce((a,r) => ({ t: a.t+(r.targeted_customers||0), resp: a.resp+(r.targeted_responders||0), ctrl: a.ctrl+(r.control_customers||0), cr: a.cr+(r.control_responders||0) }), {t:0,resp:0,ctrl:0,cr:0})
+      const conv = tot.t > 0 ? ((tot.resp/tot.t)*100).toFixed(1) : '—'
+      const lift = tot.t > 0 && tot.ctrl > 0 ? (((tot.resp/tot.t)-(tot.cr/tot.ctrl))*100).toFixed(1) : null
+      return `  ${v}: ${tot.t} targeted → ${tot.resp} resp (${conv}% conv${lift ? `, lift: ${Number(lift)>=0?'+':''}${lift}pp` : ''})`
+    }).join('\n')
+    const dateDetail = dates2.map(d => {
+      const dRows = rows.filter(r => r.data_date === d)
+      const tot = dRows.reduce((a,r) => ({ t: a.t+(r.targeted_customers||0), resp: a.resp+(r.targeted_responders||0) }), {t:0,resp:0})
+      const conv = tot.t > 0 ? ((tot.resp/tot.t)*100).toFixed(1) : '—'
+      return `  ${d}: ${tot.t} targeted → ${tot.resp} resp (${conv}% conv)`
+    }).join('\n')
+    const prompt = `You are a senior CRM Analyst at Hepsibahis, an online sports betting and casino in the Turkish market.
+
+Analyse this specific reload segment and provide a focused commercial assessment.
+
+SEGMENT: ${g.label}
+Period: ${dates2[0]} to ${dates2[dates2.length-1]} (${dates2.length} days)
+
+Value segment breakdown (all-time):
+${segDetail}
+
+Daily performance:
+${dateDetail}
+
+Write a concise analysis (max 250 words, no headers, flowing text):
+1. Overall verdict for this segment — is it performing well?
+2. Which value segments are strongest vs weakest — be specific
+3. Any notable daily trends (improving, declining, inconsistent?)
+4. One or two specific actionable recommendations
+Be direct and commercially focused.`
+
+    try {
+      const res = await fetch('/api/reload-analysis', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setAnalysisResult(data.result)
+    } catch(e) { setAnalysisResult('Error: ' + e.message) }
+    setAnalysing(false)
+  }
 
   const toggleDay = (groupKey, date) => {
     const k = `${groupKey}||${date}`
@@ -277,10 +330,15 @@ export default function ReloadDashboard({ onUpload }) {
             <>
               <div style={{ background: 'var(--bg2)', border: `1px solid var(--border)`, borderLeft: `3px solid ${g.color}`, borderRadius: 'var(--radius-lg)', padding: '11px 16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', color: g.color }}>{g.label}</div>
-                <div style={{ display: 'flex', gap: '16px', fontSize: '0.78rem', fontFamily: 'var(--font-mono)' }}>
-                  <span style={{ color: 'var(--text2)' }}>All time: <strong style={{ color: 'var(--text)' }}>{fmt(allTimeTot.targeted)}</strong> targeted</span>
-                  <span style={{ color: 'var(--success)' }}><strong>{fmt(allTimeTot.responders)}</strong> resp</span>
-                  <span style={{ color: 'var(--accent)' }}><strong>{pct(allTimeTot.responders, allTimeTot.targeted) || '—'}%</strong> conv</span>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '16px', fontSize: '0.78rem', fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ color: 'var(--text2)' }}>All time: <strong style={{ color: 'var(--text)' }}>{fmt(allTimeTot.targeted)}</strong> targeted</span>
+                    <span style={{ color: 'var(--success)' }}><strong>{fmt(allTimeTot.responders)}</strong> resp</span>
+                    <span style={{ color: 'var(--accent)' }}><strong>{pct(allTimeTot.responders, allTimeTot.targeted) || '—'}%</strong> conv</span>
+                  </div>
+                  <button className="btn-analysis" style={{ fontSize: '0.75rem', padding: '5px 12px' }} onClick={() => handleGroupAnalysis(g)} disabled={analysing}>
+                    {analysing ? <><span className="spinner" style={{ marginRight: '6px', width: '12px', height: '12px', borderWidth: '2px' }} />Analysing…</> : '🧠 Analyse'}
+                  </button>
                 </div>
               </div>
 
@@ -314,6 +372,18 @@ export default function ReloadDashboard({ onUpload }) {
                   </>
                 )
               })()}
+              {analysisResult && (
+                <div style={{ background: 'rgba(14,165,233,0.05)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '16px', fontSize: '0.84rem', lineHeight: 1.65, color: 'var(--text)' }}>
+                  <div style={{ fontSize: '0.68rem', color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px', fontWeight: 700 }}>⚡ AI Analysis — {g.label}</div>
+                  {analysisResult}
+                </div>
+              )}
+              {analysisResult && (
+                <div style={{ background: 'rgba(14,165,233,0.05)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '16px', fontSize: '0.84rem', lineHeight: 1.65, color: 'var(--text)' }}>
+                  <div style={{ fontSize: '0.68rem', color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px', fontWeight: 700 }}>⚡ AI Analysis — {g.label}</div>
+                  {analysisResult}
+                </div>
+              )}
               <div className="section-heading">Daily breakdown — click + to see value segments</div>
               <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '28px 120px 1fr 100px 100px 100px 90px 100px 90px', background: 'var(--bg3)', borderBottom: '1px solid var(--border)', padding: '8px 14px', gap: '8px' }}>
