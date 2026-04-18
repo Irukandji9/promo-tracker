@@ -111,6 +111,7 @@ export default function FunnelDashboard({ onUpload }) {
   const [fetchError, setFetchError] = useState(null)
   const [expandedGroup, setExpandedGroup] = useState(null)
   const [expandedDays, setExpandedDays] = useState({})
+  const [targetFilter, setTargetFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('all')
 
   useEffect(() => { fetchAll() }, [])
@@ -149,6 +150,8 @@ export default function FunnelDashboard({ onUpload }) {
     return { ...g, points, hasData: points.some(p => p.conv > 0) }
   }), [allData, dates])
 
+  const handleExpandGroup = (key) => { setExpandedGroup(key); setTargetFilter('all'); setExpandedDays({}) }
+
   const toggleDay = (groupKey, date) => {
     const k = `${groupKey}||${date}`
     setExpandedDays(p => ({ ...p, [k]: !p[k] }))
@@ -183,8 +186,8 @@ export default function FunnelDashboard({ onUpload }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
           {expandedGroup && (
-            <button className="btn-ghost" style={{ fontSize: '0.78rem', padding: '5px 12px' }}
-              onClick={() => { setExpandedGroup(null); setExpandedDays({}) }}>← Back</button>
+            <button className="btn-primary" style={{ fontSize: '0.82rem', padding: '7px 16px' }}
+              onClick={() => { setExpandedGroup(null); setExpandedDays({}); setTargetFilter('all') }}>← Back</button>
           )}
         </div>
         <button className="btn-analysis" style={{ fontSize: '0.78rem', padding: '5px 12px' }} onClick={onUpload}>📡 Upload CSV</button>
@@ -214,7 +217,7 @@ export default function FunnelDashboard({ onUpload }) {
               const convRate = pct(tot.responders, tot.targeted)
               const liftVal = liftPP(tot.responders, tot.targeted, tot.ctrl_resp, tot.control)
               return (
-                <div key={g.key} onClick={() => setExpandedGroup(g.key)}
+                <div key={g.key} onClick={() => handleExpandGroup(g.key)}
                   style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderLeft: `3px solid ${g.color}`, borderRadius: 'var(--radius-lg)', padding: '13px 15px', cursor: 'pointer', transition: 'all 0.12s' }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg3)'; e.currentTarget.style.borderColor = g.color }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)' }}>
@@ -257,7 +260,43 @@ export default function FunnelDashboard({ onUpload }) {
                 </div>
               </div>
 
-              <LineChart seriesData={[{ ...g, points: dates.map(d => { const rows = allData.filter(r => r.data_date === d && r.funnel_label === g.key); const t = agg(rows); return { conv: t.targeted > 0 ? (t.responders / t.targeted) * 100 : 0 } }), hasData: true }]} dates={dates} />
+              {/* Target group filter buttons */}
+              {(() => {
+                const groupRows = allData.filter(r => r.funnel_label === g.key)
+                const targets = [...new Set(groupRows.map(r => r.target_group))].sort()
+                const activeDates = dates.filter(d => allData.some(r => r.data_date === d && r.funnel_label === g.key))
+
+                // Extract suffix from target group name for display
+                const suffix = (tg) => {
+                  const parts = tg.split('_')
+                  const dayIdx = parts.findIndex(p => p.toLowerCase().startsWith('day'))
+                  if (dayIdx !== -1) return parts.slice(dayIdx).join('_')
+                  return parts[parts.length - 1]
+                }
+
+                const chartPoints = activeDates.map(d => {
+                  const rows = targetFilter === 'all'
+                    ? allData.filter(r => r.data_date === d && r.funnel_label === g.key)
+                    : allData.filter(r => r.data_date === d && r.target_group === targetFilter)
+                  const t = agg(rows)
+                  return { conv: t.targeted > 0 ? (t.responders / t.targeted) * 100 : 0 }
+                })
+
+                return (
+                  <>
+                    {targets.length > 1 && (
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Split</span>
+                        <button onClick={() => setTargetFilter('all')} style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '0.74rem', fontWeight: 500, border: '1px solid', cursor: 'pointer', background: targetFilter === 'all' ? g.color : 'transparent', borderColor: targetFilter === 'all' ? g.color : 'var(--border)', color: targetFilter === 'all' ? '#fff' : 'var(--text2)' }}>All</button>
+                        {targets.map(tg => (
+                          <button key={tg} onClick={() => setTargetFilter(tg)} style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '0.74rem', fontWeight: 500, border: '1px solid', cursor: 'pointer', background: targetFilter === tg ? g.color : 'transparent', borderColor: targetFilter === tg ? g.color : 'var(--border)', color: targetFilter === tg ? '#fff' : 'var(--text2)' }}>{suffix(tg)}</button>
+                        ))}
+                      </div>
+                    )}
+                    <LineChart seriesData={[{ ...g, points: chartPoints, hasData: chartPoints.some(p => p.conv > 0) }]} dates={activeDates} />
+                  </>
+                )
+              })()}
               <div className="section-heading">Daily breakdown — click + to see target groups for that day</div>
 
               <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>

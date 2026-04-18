@@ -134,6 +134,7 @@ export default function ReloadDashboard({ onUpload }) {
   const [expandedGroup, setExpandedGroup] = useState(null)
   const [expandedDays, setExpandedDays] = useState({})
   const [dateFilter, setDateFilter] = useState('all')
+  const [segmentFilter, setSegmentFilter] = useState('all')
 
   useEffect(() => { fetchAll() }, [])
 
@@ -175,6 +176,8 @@ export default function ReloadDashboard({ onUpload }) {
     return { ...g, points, hasData: points.some(p => p.conv > 0) }
   }), [allData, dates])
 
+  const handleExpandGroup = (key) => { setExpandedGroup(key); setSegmentFilter('all'); setExpandedDays({}) }
+
   const toggleDay = (groupKey, date) => {
     const k = `${groupKey}||${date}`
     setExpandedDays(p => ({ ...p, [k]: !p[k] }))
@@ -209,8 +212,8 @@ export default function ReloadDashboard({ onUpload }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           {expandedGroup && (
-            <button className="btn-ghost" style={{ fontSize: '0.78rem', padding: '5px 12px' }}
-              onClick={() => { setExpandedGroup(null); setExpandedDays({}) }}>← Back</button>
+            <button className="btn-primary" style={{ fontSize: '0.82rem', padding: '7px 16px' }}
+              onClick={() => { setExpandedGroup(null); setExpandedDays({}); setSegmentFilter('all') }}>← Back</button>
           )}
         </div>
         <button className="btn-analysis" style={{ fontSize: '0.78rem', padding: '5px 12px' }} onClick={onUpload}>🔄 Upload CSV</button>
@@ -240,7 +243,7 @@ export default function ReloadDashboard({ onUpload }) {
               const convRate = pct(tot.responders, tot.targeted)
               const liftVal = liftPP(tot.responders, tot.targeted, tot.ctrl_resp, tot.control)
               return (
-                <div key={g.key} onClick={() => setExpandedGroup(g.key)}
+                <div key={g.key} onClick={() => handleExpandGroup(g.key)}
                   style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderLeft: `3px solid ${g.color}`, borderRadius: 'var(--radius-lg)', padding: '13px 15px', cursor: 'pointer', transition: 'all 0.12s' }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg3)'; e.currentTarget.style.borderColor = g.color }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.borderColor = 'var(--border)' }}>
@@ -281,7 +284,36 @@ export default function ReloadDashboard({ onUpload }) {
                 </div>
               </div>
 
-              <LineChart seriesData={[{ ...g, points: dates.map(d => { const rows = groupRows(g, allData.filter(r => r.data_date === d)); const t = agg(rows); return { conv: t.targeted > 0 ? (t.responders / t.targeted) * 100 : 0 } }), hasData: true }]} dates={dates} />
+              {/* Value segment filter buttons */}
+              {(() => {
+                const groupAllData = groupRows(g, allData)
+                const valueSegs = [...new Set(groupAllData.map(r => r.value_segment).filter(Boolean))].sort((a, b) => VALUE_ORDER.indexOf(a) - VALUE_ORDER.indexOf(b))
+                const activeDates = dates.filter(d => groupRows(g, allData.filter(r => r.data_date === d)).length > 0)
+
+                // Build chart series based on segment filter
+                const chartPoints = activeDates.map(d => {
+                  const rows = segmentFilter === 'all'
+                    ? groupRows(g, allData.filter(r => r.data_date === d))
+                    : groupRows(g, allData.filter(r => r.data_date === d)).filter(r => r.value_segment === segmentFilter)
+                  const t = agg(rows)
+                  return { conv: t.targeted > 0 ? (t.responders / t.targeted) * 100 : 0 }
+                })
+
+                return (
+                  <>
+                    {valueSegs.length > 1 && (
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '12px' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Segment</span>
+                        <button onClick={() => setSegmentFilter('all')} style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '0.74rem', fontWeight: 500, border: '1px solid', cursor: 'pointer', background: segmentFilter === 'all' ? g.color : 'transparent', borderColor: segmentFilter === 'all' ? g.color : 'var(--border)', color: segmentFilter === 'all' ? '#fff' : 'var(--text2)' }}>All</button>
+                        {valueSegs.map(v => (
+                          <button key={v} onClick={() => setSegmentFilter(v)} style={{ padding: '3px 10px', borderRadius: '20px', fontSize: '0.74rem', fontWeight: 500, border: '1px solid', cursor: 'pointer', background: segmentFilter === v ? g.color : 'transparent', borderColor: segmentFilter === v ? g.color : 'var(--border)', color: segmentFilter === v ? '#fff' : 'var(--text2)' }}>{v}</button>
+                        ))}
+                      </div>
+                    )}
+                    <LineChart seriesData={[{ ...g, points: chartPoints, hasData: chartPoints.some(p => p.conv > 0) }]} dates={activeDates} />
+                  </>
+                )
+              })()}
               <div className="section-heading">Daily breakdown — click + to see value segments</div>
               <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '28px 120px 1fr 100px 100px 100px 90px 100px 90px', background: 'var(--bg3)', borderBottom: '1px solid var(--border)', padding: '8px 14px', gap: '8px' }}>
