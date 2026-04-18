@@ -89,16 +89,27 @@ export default function App({ session }) {
   useEffect(() => { fetchPromos() }, [fetchPromos])
 
   const fetchReloadData = useCallback(async () => {
-    const { data } = await supabase.from('reload_daily').select('*').order('range_start', { ascending: false }).limit(10000)
-    if (data) setReloadData(data)
+    let allRows = [], from = 0
+    while (true) {
+      const { data } = await supabase.from('reload_daily').select('*').order('data_date', { ascending: true }).range(from, from + 999)
+      if (!data || data.length === 0) break
+      allRows = allRows.concat(data)
+      if (data.length < 1000) break
+      from += 1000
+    }
+    setReloadData(allRows)
   }, [])
 
   const fetchFunnelData = useCallback(async () => {
-    const { data } = await supabase
-      .from('funnel_daily')
-      .select('*')
-      .order('data_date', { ascending: false })
-    if (data) setFunnelData(data)
+    let allRows = [], from = 0
+    while (true) {
+      const { data } = await supabase.from('funnel_daily').select('*').order('data_date', { ascending: true }).range(from, from + 999)
+      if (!data || data.length === 0) break
+      allRows = allRows.concat(data)
+      if (data.length < 1000) break
+      from += 1000
+    }
+    setFunnelData(allRows)
   }, [])
 
   useEffect(() => { fetchReloadData() }, [fetchReloadData])
