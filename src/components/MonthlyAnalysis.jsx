@@ -59,17 +59,17 @@ function CategoryBlock({ title, icon, promos, color }) {
   )
 }
 
-export default function MonthlyAnalysis({ promos, month, monthEvents, domainFilter, activeTab, reloadData, funnelData, onClose }) {
+export default function MonthlyAnalysis({ promos, month, monthEvents, domainFilter, contextTab, reloadData, funnelData, onClose }) {
   const [analysis, setAnalysis] = useState(null)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
 
   // Context-aware title and data
-  const contextLabel = activeTab === 'Reload' ? 'Reload' : activeTab === 'Funnel' ? 'Funnel' : activeTab === 'Promo Code' ? 'Promo Code' : activeTab === 'Ad-Hoc' ? 'Ad-Hoc' : 'All'
-  const isReload = activeTab === 'Reload'
-  const isFunnel = activeTab === 'Funnel'
-  const isPromoOnly = activeTab === 'Promo Code' || activeTab === 'Ad-Hoc'
+  const contextLabel = contextTab === 'Reload' ? 'Reload' : contextTab === 'Funnel' ? 'Funnel' : contextTab === 'Promo Code' ? 'Promo Code' : contextTab === 'Ad-Hoc' ? 'Ad-Hoc' : 'All'
+  const isReload = contextTab === 'Reload'
+  const isFunnel = contextTab === 'Funnel'
+  const isPromoOnly = contextTab === 'Promo Code' || contextTab === 'Ad-Hoc'
 
   const filtered = domainFilter && domainFilter !== 'All' ? promos.filter(p => p.domain === domainFilter) : promos
   const withKpis = filtered.filter(p => p.bonus_cost)
@@ -372,8 +372,8 @@ Be direct and commercially focused.`
                     </>
                   )}
                   <div className="section-heading">By Category</div>
-                  {activeTab === 'Promo Code' ? <CategoryBlock title="Promo Code Campaigns" icon="🏷️" promos={promoCodes} color="#16a34a" /> :
-                   activeTab === 'Ad-Hoc' ? <CategoryBlock title="Ad-Hoc Promotions" icon="🎯" promos={adhoc} color="#e8a020" /> : (
+                  {contextTab === 'Promo Code' ? <CategoryBlock title="Promo Code Campaigns" icon="🏷️" promos={promoCodes} color="#16a34a" /> :
+                   contextTab === 'Ad-Hoc' ? <CategoryBlock title="Ad-Hoc Promotions" icon="🎯" promos={adhoc} color="#e8a020" /> : (
                     <>
                       <CategoryBlock title="Ad-Hoc Promotions" icon="🎯" promos={adhoc} color="#e8a020" />
                       <CategoryBlock title="Promo Code Campaigns" icon="🏷️" promos={promoCodes} color="#16a34a" />

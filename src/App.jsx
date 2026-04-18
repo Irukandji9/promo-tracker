@@ -562,7 +562,7 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
       {/* MODALS */}
       {showForm && <PromoForm promo={editPromo} onSave={handleSavePromo} onClose={() => { setShowForm(false); setEditPromo(null) }} />}
       {kpiPromo && <KpiForm promo={promos.find(p => p.id === kpiPromo.id) || kpiPromo} onSave={handleSaveKpi} onClose={() => setKpiPromo(null)} onAnalyse={handleAnalyse} />}
-      {showAnalysis && <MonthlyAnalysis promos={promos} month={selectedMonth} monthEvents={monthEvents} domainFilter={domainFilter} activeTab={activeTab} reloadData={reloadData} funnelData={funnelData} onClose={() => setShowAnalysis(false)} />}
+      {showAnalysis && <MonthlyAnalysis promos={promos} month={selectedMonth} monthEvents={monthEvents} domainFilter={domainFilter} contextTab={activeTab} reloadData={reloadData} funnelData={funnelData} onClose={() => setShowAnalysis(false)} />}
       {showFunnelUpload && <FunnelUpload onClose={() => { setShowFunnelUpload(false); setFunnelRefreshKey(k => k + 1) }} onSuccess={() => {}} />}
       {showReloadUpload && <ReloadUpload onClose={() => { setShowReloadUpload(false); setReloadRefreshKey(k => k + 1) }} onSuccess={() => {}} />}
       {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
