@@ -11,6 +11,9 @@ const LC_PRODUCT_GROUPS = [
   { key: 'OTD|Casino',                 label: 'OTD Casino',                 lc: 'OTD',                 product: 'Casino',  color: '#7c3aed' },
   { key: 'OTD|Sport',                  label: 'OTD Sport',                  lc: 'OTD',                 product: 'Sport',   color: '#a78bfa' },
   { key: 'Dormant|Sport',              label: 'Dormant',                    lc: 'Dormant',             product: null,      color: '#64748b' },
+  { key: 'Active Bad Exp|Hybrid',       label: 'Active Bad Experience',      lc: 'Active Bad Exp',      product: 'Hybrid',  color: '#0891b2' },
+  { key: 'UDC Casino|Casino',           label: 'UDC Casino',                 lc: 'UDC Casino',          product: 'Casino',  color: '#be185d' },
+  { key: 'UDC Sport|Sport',             label: 'UDC Sport',                  lc: 'UDC Sport',           product: 'Sport',   color: '#9d174d' },
 ]
 
 const VALUE_ORDER = ['HV', 'MV', 'LHV', 'LLV', 'NV', 'EV', '']
