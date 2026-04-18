@@ -378,12 +378,6 @@ Be direct and commercially focused.`
                   {analysisResult}
                 </div>
               )}
-              {analysisResult && (
-                <div style={{ background: 'rgba(14,165,233,0.05)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '16px', fontSize: '0.84rem', lineHeight: 1.65, color: 'var(--text)' }}>
-                  <div style={{ fontSize: '0.68rem', color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px', fontWeight: 700 }}>⚡ AI Analysis — {g.label}</div>
-                  {analysisResult}
-                </div>
-              )}
               <div className="section-heading">Daily breakdown — click + to see value segments</div>
               <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '28px 120px 1fr 100px 100px 100px 90px 100px 90px', background: 'var(--bg3)', borderBottom: '1px solid var(--border)', padding: '8px 14px', gap: '8px' }}>
