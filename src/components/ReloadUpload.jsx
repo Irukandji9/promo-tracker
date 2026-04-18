@@ -291,8 +291,7 @@ export default function ReloadUpload({ onClose, onSuccess }) {
                         {[...grouped[lc]].sort((a, b) => VALUE_ORDER.indexOf(a.value_segment) - VALUE_ORDER.indexOf(b.value_segment)).map((r, i) => (
                           <tr key={i} style={{ borderBottom: '1px solid var(--border)', opacity: r.decoded_label ? 1 : 0.4 }}>
                             <td style={{ padding: '6px 10px', fontFamily: 'var(--font-mono)', fontSize: '0.68rem', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {r.is_reminder && <span style={{ fontSize: '0.6rem', background: 'rgba(251,191,36,0.15)', color: 'var(--warning)', padding: '1px 4px', borderRadius: '3px', marginRight: '4px' }}>REM</span>}
-                              {r.target_group}
+{r.target_group}
                             </td>
                             <td style={{ padding: '6px 10px', fontSize: '0.73rem', color: r.decoded_label ? 'var(--text)' : 'var(--danger)' }}>{r.decoded_label || '— no match'}</td>
                             <td style={{ padding: '6px 10px', fontSize: '0.73rem', color: 'var(--text2)' }}>{r.product || '—'}</td>

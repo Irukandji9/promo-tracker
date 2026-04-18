@@ -299,7 +299,7 @@ export default function ReloadDashboard({ onUpload }) {
                   const liftVal = liftPP(tot.responders, tot.targeted, tot.ctrl_resp, tot.control)
                   const dayKey = `${expandedGroup}||${date}`
                   const isOpen = expandedDays[dayKey]
-                  const valueRows = dayRows.filter(r => !r.is_reminder).sort((a, b) => VALUE_ORDER.indexOf(a.value_segment) - VALUE_ORDER.indexOf(b.value_segment))
+                  const valueRows = [...dayRows].sort((a, b) => { const vs = VALUE_ORDER.indexOf(a.value_segment) - VALUE_ORDER.indexOf(b.value_segment); if (vs !== 0) return vs; return (a.is_reminder ? 1 : 0) - (b.is_reminder ? 1 : 0) })
 
                   return (
                     <React.Fragment key={date}>
@@ -313,7 +313,7 @@ export default function ReloadDashboard({ onUpload }) {
                           {isOpen ? '−' : '+'}
                         </div>
                         <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', fontWeight: 600 }}>{date}</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text3)' }}>{valueRows.length} value segment{valueRows.length !== 1 ? 's' : ''}</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text3)' }}>{valueRows.length} segment{valueRows.length !== 1 ? 's' : ''}</div>
                         <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>{fmt(tot.targeted)}</div>
                         <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text2)' }}>{fmt(tot.control)}</div>
                         <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', fontWeight: 700, color: 'var(--success)' }}>{fmt(tot.responders)}</div>
