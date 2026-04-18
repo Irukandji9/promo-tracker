@@ -639,21 +639,23 @@ function ReloadOverviewSection({ reloadData }) {
 
   const VALUE_ORDER = ['HV', 'MV', 'LHV', 'LLV', 'NV', 'EV', '']
   const dates = [...new Set(reloadData.map(r => r.data_date).filter(Boolean))].sort().reverse()
-  const latest = dates[0]
-  if (!latest) return null
+  const recentDates = dates.slice(0, 3)
+  if (!recentDates.length) return null
 
-  const rows = reloadData
-    .filter(r => r.data_date === latest && !r.is_reminder)
-    .sort((a, b) => {
-      const lc = (a.lifecycle || '').localeCompare(b.lifecycle || '')
-      if (lc !== 0) return lc
-      return VALUE_ORDER.indexOf(a.value_segment) - VALUE_ORDER.indexOf(b.value_segment)
-    })
+  const rows = recentDates.flatMap(date =>
+    reloadData
+      .filter(r => r.data_date === date)
+      .sort((a, b) => {
+        const lc = (a.lifecycle || '').localeCompare(b.lifecycle || '')
+        if (lc !== 0) return lc
+        return VALUE_ORDER.indexOf(a.value_segment) - VALUE_ORDER.indexOf(b.value_segment)
+      }).map(r => ({ ...r, _date: date }))
+  )
 
   return (
     <div style={{ marginTop: '24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-        <div className="section-heading" style={{ margin: 0 }}>🔄 Reload — {latest}</div>
+        <div className="section-heading" style={{ margin: 0 }}>🔄 Reload — Recent {recentDates.length} Days</div>
         <span style={{ fontSize: '0.72rem', color: 'var(--text3)' }}>{dates.length} day{dates.length !== 1 ? 's' : ''} uploaded</span>
       </div>
       <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
@@ -672,7 +674,7 @@ function ReloadOverviewSection({ reloadData }) {
                 <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: 'var(--text2)', whiteSpace: 'nowrap' }}>{latest}</td>
+                  <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: 'var(--text2)', whiteSpace: 'nowrap' }}>{r._date}</td>
                   <td style={{ padding: '8px 12px', fontWeight: 600, fontSize: '0.75rem', whiteSpace: 'nowrap' }}>{r.lifecycle} {r.product}</td>
                   <td style={{ padding: '8px 12px' }}>
                     {r.value_segment ? <span style={{ fontSize: '0.68rem', padding: '2px 7px', borderRadius: '4px', background: 'var(--bg3)', border: '1px solid var(--border)', fontWeight: 700 }}>{r.value_segment}</span> : '—'}
