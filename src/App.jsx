@@ -7,11 +7,12 @@ import FunnelUpload from './components/FunnelUpload'
 import FunnelDashboard from './components/FunnelDashboard'
 import ReloadUpload from './components/ReloadUpload'
 import ReloadDashboard from './components/ReloadDashboard'
+import BriefGenerator from './components/BriefGenerator'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const currentYear = new Date().getFullYear()
 const ALL_MONTHS = MONTHS.map(m => `${m} ${currentYear}`)
-const TABS = ['Overview', 'Ad-Hoc', 'Promo Code', 'Reload', 'Funnel']
+const TABS = ['Overview', 'Ad-Hoc', 'Promo Code', 'Reload', 'Funnel', 'Brief']
 const DOMAINS = ['All', 'Hepsibahis', 'MrOyun', 'UWIN']
 const TYPE_COLORS = { 'Ad-Hoc': '#e8a020', 'Promo Code': '#16a34a', 'Reload': '#1a6ef5', 'Funnel': '#7c3aed' }
 
@@ -401,10 +402,10 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
             color: activeTab === tab ? (tab === 'Overview' ? 'var(--accent)' : TYPE_COLORS[tab]) : 'var(--text2)',
             marginBottom: '-1px', transition: 'all 0.12s',
           }}>
-            {tab === 'Overview' ? '📊 ' : ''}{tab}
-            <span style={{ marginLeft: '5px', fontSize: '0.68rem', background: 'var(--bg3)', padding: '1px 6px', borderRadius: '10px', color: 'var(--text3)' }}>
+            {tab === 'Overview' ? '📊 ' : tab === 'Brief' ? '📝 ' : ''}{tab}
+            {tab !== 'Brief' && <span style={{ marginLeft: '5px', fontSize: '0.68rem', background: 'var(--bg3)', padding: '1px 6px', borderRadius: '10px', color: 'var(--text3)' }}>
               {tab === 'Overview' ? domainFiltered.length : domainFiltered.filter(p => p.type === tab).length}
-            </span>
+            </span>}
           </button>
         ))}
       </div>
@@ -416,6 +417,8 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
             <span className="spinner" style={{ width: '28px', height: '28px', borderWidth: '3px' }} />
             <p style={{ marginTop: '14px', fontSize: '0.85rem' }}>Loading…</p>
           </div>
+        ) : activeTab === 'Brief' ? (
+          <BriefGenerator />
         ) : activeTab === 'Funnel' ? (
           /* FUNNEL DASHBOARD — always shown, handles its own empty state */
           <FunnelDashboard key={funnelRefreshKey} onUpload={() => setShowFunnelUpload(true)} />
