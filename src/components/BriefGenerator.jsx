@@ -719,22 +719,41 @@ Return ONLY the JSON array.`
         {!historyLoading && history.length === 0 && (
           <div style={{ fontSize: '0.8rem', color: 'var(--text3)', textAlign: 'center', padding: '20px', lineHeight: 1.6 }}>No briefs generated yet.<br />Your history will appear here.</div>
         )}
-        {history.map(h => (
-          <div key={h.id}
-            onClick={() => loadFromHistory(h)}
-            style={{ background: selectedHistory?.id === h.id ? 'rgba(26,110,245,0.06)' : 'var(--bg2)', border: `1px solid ${selectedHistory?.id === h.id ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius)', padding: '10px 12px', marginBottom: '8px', cursor: 'pointer', transition: 'all 0.15s' }}
-            onMouseEnter={e => { if (selectedHistory?.id !== h.id) e.currentTarget.style.borderColor = 'rgba(0,0,0,0.18)' }}
-            onMouseLeave={e => { if (selectedHistory?.id !== h.id) e.currentTarget.style.borderColor = 'var(--border)' }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.8rem', lineHeight: 1.3, marginBottom: '3px', flex: 1, paddingRight: '6px' }}>{h.name}</div>
-              <button onClick={(e) => deleteHistory(h.id, e)} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: '0.75rem', cursor: 'pointer', padding: '0', flexShrink: 0 }}>✕</button>
+        {!historyLoading && (() => {
+          // Group by month
+          const groups = {}
+          history.forEach(h => {
+            const d = new Date(h.created_at)
+            const key = d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+            if (!groups[key]) groups[key] = []
+            groups[key].push(h)
+          })
+          return Object.entries(groups).map(([month, entries]) => (
+            <div key={month} style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px', paddingBottom: '4px', borderBottom: '1px solid var(--border)' }}>
+                {month}
+              </div>
+              {entries.map(h => (
+                <div key={h.id}
+                  onClick={() => loadFromHistory(h)}
+                  style={{ background: selectedHistory?.id === h.id ? 'rgba(26,110,245,0.06)' : 'var(--bg2)', border: `1px solid ${selectedHistory?.id === h.id ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius)', padding: '8px 10px', marginBottom: '6px', cursor: 'pointer', transition: 'all 0.15s' }}
+                  onMouseEnter={e => { if (selectedHistory?.id !== h.id) e.currentTarget.style.borderColor = 'rgba(0,0,0,0.18)' }}
+                  onMouseLeave={e => { if (selectedHistory?.id !== h.id) e.currentTarget.style.borderColor = 'var(--border)' }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.78rem', lineHeight: 1.3, marginBottom: '2px', flex: 1, paddingRight: '6px' }}>{h.name}</div>
+                    <button onClick={(e) => deleteHistory(h.id, e)} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: '0.72rem', cursor: 'pointer', padding: '0', flexShrink: 0 }}>✕</button>
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text3)', fontFamily: 'var(--font-mono)' }}>{h.promo_code}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text2)' }}>{h.domain} · {h.reward_type}</div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text3)' }}>{new Date(h.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text3)', marginBottom: '3px', fontFamily: 'var(--font-mono)' }}>{h.promo_code}</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text2)' }}>{h.domain} · {h.reward_type}</div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--text3)', marginTop: '3px' }}>{new Date(h.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
-          </div>
-        ))}
+          ))
+        })()}
       </div>
 
     </div>

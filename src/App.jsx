@@ -14,6 +14,7 @@ const currentYear = new Date().getFullYear()
 const ALL_MONTHS = MONTHS.map(m => `${m} ${currentYear}`)
 const TABS = ['Overview', 'Ad-Hoc', 'Promo Code', 'Reload', 'Funnel', 'Brief']
 const DOMAINS = ['All', 'Hepsibahis', 'MrOyun', 'UWIN']
+const DOMAIN_LABELS = { 'All': 'All', 'Hepsibahis': 'TR', 'MrOyun': 'OY', 'UWIN': 'UW' }
 const TYPE_COLORS = { 'Ad-Hoc': '#e8a020', 'Promo Code': '#16a34a', 'Reload': '#1a6ef5', 'Funnel': '#7c3aed' }
 
 function fmt(v) { return v ? `₺${Number(v).toLocaleString('tr-TR')}` : '—' }
@@ -326,7 +327,6 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
           <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', letterSpacing: '-0.01em' }}>
             PROMO<span style={{ color: 'var(--accent)' }}>TRACK</span>
           </span>
-          <span style={{ fontSize: '0.67rem', color: 'var(--text3)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: '10px', borderLeft: '1px solid var(--border)' }}>Hepsibahis CRM</span>
         </div>
         <div style={{ display: 'flex', gap: '7px', alignItems: 'center' }}>
           <button className="btn-analysis" style={{ padding: '7px 14px', fontSize: '0.8rem' }} onClick={() => setShowAnalysis(true)}>🧠 Monthly Analysis</button>
@@ -364,7 +364,7 @@ Write a sharp commercial analysis (max 220 words, no headers, flowing text):
             borderColor: domainFilter === d ? '#1a6ef5' : 'var(--border)',
             color: domainFilter === d ? '#fff' : 'var(--text2)',
           }}>
-            {d}
+            {DOMAIN_LABELS[d]}
           </button>
         ))}
       </div>
