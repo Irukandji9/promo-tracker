@@ -234,12 +234,16 @@ Each clause object: { "en": "English clause text.", "tr": "Turkish clause text."
 
 RULES:
 1. Write simple, clear clauses — no section headers, no numbering. Just the clause text.
-2. Cover: qualification requirements → timing/period → what the player receives → any special conditions or disqualifiers → tiered reward structures integrated naturally into the flow.
-3. Tiered structures must be written as proper clauses in the flow — not as a block at the end.
-4. Keep each clause to 1–2 sentences maximum.
-5. Do NOT include standard reward clauses (Free Bet rules, Casino Bonus wagering, Free Spin rules) — those are appended automatically after your output.
+2. Cover: qualification requirements → timing/period → what the player receives → any special conditions or disqualifiers → tiered reward structures.
+3. TIERED STRUCTURES — this is critical: ALL tiers must be written as a SINGLE clause object, never as separate clauses. Format the single clause as a multi-line string:
+   - First line: one sentence explaining the mechanic (e.g. "Cashback is calculated on daily net loss and credited as Free Bet.")
+   - Then each tier on its own line starting with a dash: "- ₺X – ₺Y net loss → Z% cashback, up to ₺W"
+   - The "en" and "tr" fields can contain newline characters (\\n) to separate the intro line from the tier lines
+   - Turkish tier format: "- ₺X – ₺Y net kayıp → %Z kayıp iadesi, maksimum ₺W"
+4. Keep non-tier clauses to 1–2 sentences maximum.
+5. Do NOT include standard reward clauses (Free Bet rules, Casino Bonus wagering, Free Spin rules) — those are appended automatically.
 6. Do NOT number the clauses.
-7. Aim for 3–8 clauses for a standard promo. Tiered promos may need more.`
+7. Aim for 3–8 clauses total. Tiered promos: the tier block counts as 1 clause.`
 
       const userPrompt = `Write the T&C clauses for this promotion:
 
@@ -378,13 +382,30 @@ Return ONLY the JSON array.`
       })
     })
 
+    // Build paragraphs from clause text — handles multi-line with dash items
+    const buildClauseParagraphs = (text, opts = {}) => {
+      const lines = text.split('\n')
+      return lines.map(line => {
+        const isDash = line.trim().startsWith('-')
+        const content = isDash ? line.trim().slice(1).trim() : line
+        return new Paragraph({
+          spacing: { before: isDash ? 40 : 0, after: 0 },
+          indent: isDash ? { left: 160 } : {},
+          children: [
+            ...(isDash ? [new TextRun({ text: '– ', size: opts.sz || 19, font: 'Arial', color: opts.col || '1a1a1a', italics: opts.it })] : []),
+            new TextRun({ text: content, size: opts.sz || 19, font: 'Arial', color: opts.col || '1a1a1a', italics: opts.it })
+          ]
+        })
+      })
+    }
+
     const termRows = [new TableRow({ children: [hCell('English', half), hCell('Turkish / Türkçe', half)] })]
     aiClauses.forEach((c, i) => {
       const sh = i % 2 === 0
       termRows.push(new TableRow({
         children: [
-          dCell([new Paragraph({ children: [new TextRun({ text: `${i + 1}. `, bold: true, size: 19, font: 'Arial' }), new TextRun({ text: c.en, size: 19, font: 'Arial' })] })], half, sh),
-          dCell([new Paragraph({ children: [new TextRun({ text: `${i + 1}. `, bold: true, size: 19, font: 'Arial' }), new TextRun({ text: c.tr, size: 19, font: 'Arial' })] })], half, sh),
+          dCell([new Paragraph({ spacing: { before: 0, after: 2 }, children: [new TextRun({ text: `${i + 1}. `, bold: true, size: 19, font: 'Arial' })] }), ...buildClauseParagraphs(c.en)], half, sh),
+          dCell([new Paragraph({ spacing: { before: 0, after: 2 }, children: [new TextRun({ text: `${i + 1}. `, bold: true, size: 19, font: 'Arial' })] }), ...buildClauseParagraphs(c.tr)], half, sh),
         ]
       }))
     })
@@ -765,6 +786,30 @@ function BriefPreview({ data: d, clauses, stds }) {
   if (!d || !clauses) return null
   const isSp = d.isSports
 
+  // Renders clause text — splits on newlines, renders dash lines as indented items
+  function ClauseText({ text, style = {} }) {
+    const lines = text.split('\n')
+    return (
+      <div style={style}>
+        {lines.map((line, i) => {
+          const isDash = line.trim().startsWith('-')
+          return (
+            <div key={i} style={{
+              paddingLeft: isDash ? '10px' : '0',
+              marginTop: isDash ? '2px' : i > 0 ? '4px' : '0',
+              lineHeight: 1.5,
+              display: 'flex',
+              gap: isDash ? '4px' : '0',
+            }}>
+              {isDash && <span style={{ flexShrink: 0 }}>–</span>}
+              <span>{isDash ? line.trim().slice(1).trim() : line}</span>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   let num = 1
   const clauseRows = clauses.map(c => {
     const n = num++
@@ -772,10 +817,16 @@ function BriefPreview({ data: d, clauses, stds }) {
     return (
       <tr key={n}>
         <td style={{ border: '1px solid #dde1ea', padding: '5px 9px', verticalAlign: 'top', background: shade }}>
-          <div style={{ display: 'flex', gap: '7px' }}><span style={{ fontWeight: 700, color: '#00163B', minWidth: '18px' }}>{n}.</span><span>{c.en}</span></div>
+          <div style={{ display: 'flex', gap: '7px' }}>
+            <span style={{ fontWeight: 700, color: '#00163B', minWidth: '18px', flexShrink: 0 }}>{n}.</span>
+            <ClauseText text={c.en} />
+          </div>
         </td>
         <td style={{ border: '1px solid #dde1ea', padding: '5px 9px', verticalAlign: 'top', background: shade }}>
-          <div style={{ display: 'flex', gap: '7px' }}><span style={{ fontWeight: 700, color: '#00163B', minWidth: '18px' }}>{n}.</span><span>{c.tr}</span></div>
+          <div style={{ display: 'flex', gap: '7px' }}>
+            <span style={{ fontWeight: 700, color: '#00163B', minWidth: '18px', flexShrink: 0 }}>{n}.</span>
+            <ClauseText text={c.tr} />
+          </div>
         </td>
       </tr>
     )
